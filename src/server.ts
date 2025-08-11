@@ -22,9 +22,9 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// Process quick alert: alertname (optional) + pod (required) + elasticsearch settings
+// Process quick alert: alertname (optional) + pod (required) + preset + elasticsearch settings
 app.post('/api/quick', async (req, res) => {
-  const { alertname, pod, elasticSettings } = req.body || {};
+  const { alertname, pod, preset, elasticSettings, logTypes } = req.body || {};
   if (!pod) {
     return res.status(400).json({ error: 'pod is required' });
   }
@@ -34,6 +34,14 @@ app.post('/api/quick', async (req, res) => {
     timeframeMinutes: elasticSettings?.timeframeMinutes || 60,
     documentLimit: elasticSettings?.documentLimit || 100,
     slowRequestThreshold: elasticSettings?.slowRequestThreshold || 1
+  };
+
+  // Default log types if not provided
+  const enabledLogTypes = logTypes || {
+    general: true,
+    error: true,
+    slow: true,
+    timeDebugger: true
   };
 
   const alert: Alert = {
@@ -48,14 +56,15 @@ app.post('/api/quick', async (req, res) => {
       ct_cluster: 'unknown',
       namespace: 'default',
       target: 'slack',
-      team: 'unknown'
+      team: 'unknown',
+      preset: preset || 'general' // Include preset information
     }
   };
 
   try {
     validateConfig();
     const service = new SimpleAlertService(appConfig);
-    const context = await service.processAlert(alert, settings);
+    const context = await service.processAlert(alert, settings, enabledLogTypes);
     res.json(context);
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to process alert' });

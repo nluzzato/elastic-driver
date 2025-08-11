@@ -11,7 +11,7 @@ import { LogModal } from '../components/LogModal';
 import { RequestTraceModal } from '../components/RequestTraceModal';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import { defaultElasticSettings, prometheusAlertPrompt, aiAnalysisPrompt } from '../../config/application';
+import { defaultElasticSettings, prometheusAlertPrompt, aiAnalysisPrompt, presets, getDefaultPreset, type Preset } from '../../config/application';
 
 type Health = {
   ok: boolean;
@@ -46,6 +46,7 @@ export const App: React.FC = () => {
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string>('');
   const [isRequestTraceModalOpen, setIsRequestTraceModalOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<Preset>(getDefaultPreset());
   const [elasticSettings, setElasticSettings] = useState<ElasticSettings>(defaultElasticSettings);
   const [showElasticSettings, setShowElasticSettings] = useState(false);
   const [aiPromptSettings, setAIPromptSettings] = useState<AIPromptSettings>({
@@ -77,10 +78,12 @@ export const App: React.FC = () => {
       const res = await fetch('/api/quick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          alertname: form.alertname, 
+                body: JSON.stringify({
+          alertname: form.alertname,
           pod: form.pod,
-          elasticSettings: elasticSettings
+          preset: selectedPreset.id,
+          elasticSettings: elasticSettings,
+          logTypes: selectedPreset.logTypes
         })
       });
       const json = await res.json();
@@ -122,6 +125,20 @@ export const App: React.FC = () => {
     setSelectedRequestId('');
   };
 
+  const handlePresetChange = (presetId: string) => {
+    const preset = presets.find(p => p.id === presetId);
+    if (preset) {
+      setSelectedPreset(preset);
+      // Update elastic settings based on preset
+      setElasticSettings(preset.elasticSettings);
+      // Update AI prompt based on preset
+      setAIPromptSettings(prev => ({
+        ...prev,
+        analysisPrompt: preset.defaultPrompt
+      }));
+    }
+  };
+
   return (
     <div>
       <header className="app-header">
@@ -134,7 +151,7 @@ export const App: React.FC = () => {
       <div className="container">
         <div className="grid-2col">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-            <SectionCard title="🚀 Quick Analysis" actions={
+            <SectionCard title={`🚀 Run Analysis - ${selectedPreset.icon} ${selectedPreset.name}`} actions={
               <Button 
                 variant="primary" 
                 size="md" 
@@ -143,10 +160,33 @@ export const App: React.FC = () => {
                 leftIcon="⚡"
                 onClick={submitQuick}
               >
-                Analyze Logs
+                Run Analysis
               </Button>
             }>
               <div className="elastic-settings-grid">
+                <div className="preset-selector">
+                  <label className="elastic-setting-label">Investigation Preset</label>
+                  <select 
+                    className="elastic-input preset-dropdown"
+                    value={selectedPreset.id}
+                    onChange={(e) => handlePresetChange(e.target.value)}
+                  >
+                    {presets.map(preset => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.icon} {preset.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="preset-description">
+                    {selectedPreset.description}
+                  </div>
+                  <div className="preset-tags">
+                    {selectedPreset.tags.map(tag => (
+                      <span key={tag} className="preset-tag">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+
                 <Input
                   label="Pod Name"
                   placeholder="e.g. my-app-656f8b67bc-cf6pm"

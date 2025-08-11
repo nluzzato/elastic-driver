@@ -63,6 +63,31 @@ Request trace documents:`,
     slowRequestThreshold: 1.0
   },
 
+  // ===== PRESET SYSTEM =====
+  
+  // Investigation presets for different problem-solving scenarios
+  presets: [
+    {
+      id: 'general',
+      name: 'General Investigation',
+      description: 'Standard investigation with all log types and moderate timeframe',
+      icon: '🔍',
+      elasticSettings: {
+        timeframeMinutes: 60,
+        documentLimit: 100,
+        slowRequestThreshold: 1.0
+      },
+      logTypes: {
+        general: true,
+        error: true,
+        slow: true,
+        timeDebugger: true
+      },
+      defaultPrompt: 'Analyze this alert and related logs to understand the issue and provide actionable recommendations.',
+      tags: ['default', 'comprehensive']
+    }
+  ],
+
   // Default AI Settings
   defaultAiSettings: {
     temperature: 0.3,
@@ -119,6 +144,7 @@ export const {
   contextualDebugPrompt,
   defaultElasticSettings,
   defaultAiSettings,
+  presets,
   requestTracing,
   logDisplay,
   timeouts,
@@ -129,3 +155,37 @@ export const {
 export type ElasticSettings = typeof defaultElasticSettings;
 export type AiSettings = typeof defaultAiSettings;
 export type RequestTracingConfig = typeof requestTracing;
+
+// Preset type definitions
+export interface Preset {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  elasticSettings: {
+    timeframeMinutes: number;
+    documentLimit: number;
+    slowRequestThreshold: number;
+  };
+  logTypes: {
+    general: boolean;
+    error: boolean;
+    slow: boolean;
+    timeDebugger: boolean;
+  };
+  defaultPrompt: string;
+  tags: string[];
+}
+
+// Preset helper functions
+export const getPresetById = (id: string): Preset | undefined => {
+  return presets.find(preset => preset.id === id);
+};
+
+export const getDefaultPreset = (): Preset => {
+  return presets[0]; // General Investigation
+};
+
+export const getPresetsByTag = (tag: string): Preset[] => {
+  return presets.filter(preset => preset.tags.includes(tag));
+};
