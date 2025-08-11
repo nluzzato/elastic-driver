@@ -69,8 +69,9 @@ app.post('/api/quick', async (req, res) => {
     // Get preset behavior if preset is specified
     const presetData = preset ? getPresetById(preset) : null;
     const specialBehavior = presetData?.specialBehavior;
+    const presetConfig = presetData ? { gitHubRepo: presetData.gitHubRepo } : undefined;
     
-    const context = await service.processAlert(alert, settings, enabledLogTypes, specialBehavior);
+    const context = await service.processAlert(alert, settings, enabledLogTypes, specialBehavior, presetConfig);
     res.json(context);
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to process alert' });
