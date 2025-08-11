@@ -8,6 +8,8 @@ import { CodeBlock } from '../components/CodeBlock';
 import { SourceLink } from '../components/SourceLink';
 import { LogTable } from '../components/LogTable';
 import { LogModal } from '../components/LogModal';
+import { Button } from '../components/Button';
+import { Input } from '../components/Input';
 
 type Health = {
   ok: boolean;
@@ -75,7 +77,11 @@ export const App: React.FC = () => {
       const res = await fetch('/api/quick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ 
+          alertname: form.alertname, 
+          pod: form.pod,
+          elasticSettings: elasticSettings
+        })
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Request failed');
@@ -118,19 +124,45 @@ export const App: React.FC = () => {
       <div className="container">
         <div className="grid-2col">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-            <SectionCard title="Quick Run" actions={
-              <div className="row">
-                <button className="button" disabled={!canSubmit || loading} onClick={submitQuick}>
-                  {loading ? 'Processing…' : 'Run'}
-                </button>
-              </div>
+            <SectionCard title="🚀 Quick Analysis" actions={
+              <Button 
+                variant="primary" 
+                size="md" 
+                disabled={!canSubmit} 
+                isLoading={loading}
+                leftIcon="⚡"
+                onClick={submitQuick}
+              >
+                Analyze Logs
+              </Button>
             }>
-              <div className="row" style={{ gap: 12 }}>
-                <input className="input" placeholder="alertname (optional - e.g. ContainerCPUThrotellingIsHigh)" value={form.alertname} onChange={(e) => setForm((f) => ({ ...f, alertname: e.target.value }))} aria-label="Alert name (optional)" />
-                <input className="input" placeholder="pod (required - e.g. my-pod-123)" value={form.pod} onChange={(e) => setForm((f) => ({ ...f, pod: e.target.value }))} aria-label="Pod name (required)" />
+              <div className="elastic-settings-grid">
+                <Input
+                  label="Pod Name"
+                  placeholder="e.g. my-app-656f8b67bc-cf6pm"
+                  value={form.pod}
+                  onChange={(e) => setForm((f) => ({ ...f, pod: e.target.value }))}
+                  required
+                  hint="The Kubernetes pod to analyze"
+                />
+                
+                <Input
+                  label="Alert Name"
+                  placeholder="e.g. ContainerCPUThrottlingIsHigh"
+                  value={form.alertname}
+                  onChange={(e) => setForm((f) => ({ ...f, alertname: e.target.value }))}
+                  optional
+                  hint="Leave empty for general log analysis"
+                />
               </div>
-              {loading && <div className="skeleton" style={{ height: 40, marginTop: 12 }} />}
-              {error && <div role="alert" className="muted" style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</div>}
+              
+              {loading && <div className="skeleton enhanced-skeleton" />}
+              {error && (
+                <div role="alert" className="quick-run-error">
+                  <span className="quick-run-error-icon">⚠️</span>
+                  {error}
+                </div>
+              )}
             </SectionCard>
 
             <div className="elastic-settings-card">

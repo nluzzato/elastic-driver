@@ -14,7 +14,7 @@ This document describes the GUI architecture, how it interacts with the existing
 - Stack: Express with CORS + JSON middleware.
 - Endpoints:
   - `GET /api/health`: Calls `SimpleAlertService.fullHealthCheck()` and returns `{ github, openai, elasticsearch, grafana }` service connectivity.
-  - `POST /api/quick`: Accepts `{ alertname, pod }` and constructs a minimal `Alert`, then calls `SimpleAlertService.processAlert()` and returns the resulting `ContextOutput`.
+  - `POST /api/quick`: Accepts `{ alertname, pod, elasticSettings? }` and constructs a minimal `Alert`, then calls `SimpleAlertService.processAlert()` with the elastic settings and returns the resulting `ContextOutput`.
   - `POST /api/alert`: Accepts a full `Alert` JSON payload and returns the resulting `ContextOutput`.
 
 The server uses the existing configuration loader `src/config/index.ts` and does not duplicate business logic.
@@ -28,7 +28,7 @@ The server uses the existing configuration loader `src/config/index.ts` and does
 The `App` screen provides:
 - Service Health panel: Calls `/api/health` and displays connectivity status for GitHub, OpenAI, Elasticsearch, Grafana.
 - Quick Run form: `alertname` (optional) + `pod` (required) to invoke `/api/quick`. The response renders structured fields with rich UI components.
-- Collapsible Settings Panels: Elasticsearch configuration (timeframe, document limits, slow request threshold) and AI prompt configuration.
+- Collapsible Settings Panels: Elasticsearch configuration (timeframe, document limits, slow request threshold) that dynamically controls log fetching behavior, and AI prompt configuration.
 - Enhanced Log Display: Four log categories (General, Error, Time Debugger, Slow Requests) with clear visual selection indicators and clickable entries.
 
 ### API Response Shape for GUI
@@ -60,6 +60,12 @@ interface ElasticLogEntry {
   environment?: string;
   applicationName?: string;
   requestTime?: number; // For slow request logs
+}
+
+interface ElasticSettings {
+  timeframeMinutes: number;    // Search timeframe (not yet implemented) 
+  documentLimit: number;       // Number of documents to fetch per log type
+  slowRequestThreshold: number; // Threshold in seconds for slow requests
 }
 ```
 
@@ -93,7 +99,7 @@ Alternatively, run only the API with `npm run server` and open the Vite dev serv
 
 ## Recent Enhancements (Completed)
 
-- ✅ Collapsible settings panels for Elasticsearch and AI prompt configuration
+- ✅ Functional collapsible settings panels for Elasticsearch (document limits, slow thresholds) and AI prompt configuration
 - ✅ Enhanced log categorization with four types: General, Error, Time Debugger, Slow Requests
 - ✅ Clickable log entries with detailed modal view
 - ✅ Markdown rendering for AI explanations and analysis

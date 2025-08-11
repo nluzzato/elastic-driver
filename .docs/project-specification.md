@@ -71,12 +71,13 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 - **File**: `src/services/ElasticsearchService.ts`
 - **Purpose**: Fetches contextual logs for alert correlation
 - **Implementation**: Direct HTTP requests (not Elasticsearch client)
-- **Log Types Retrieved**:
-  - **General Logs**: Last 100 general application logs
-  - **Error Logs**: Last 100 ERROR-level logs (`json.levelname = "ERROR"`)
-  - **Time Debugger Logs**: Last 100 TIME_DEBUGGER [SLOW] logs (`[TIME_DEBUGGER] [SLOW]` in message)
-  - **Slow Request Logs**: Last 100 logs where `json.request_time > threshold` (configurable, default 1s)
+- **Log Types Retrieved** (configurable via UI settings):
+  - **General Logs**: Configurable number (default 100) of general application logs
+  - **Error Logs**: Configurable number (default 100) of ERROR-level logs (`json.levelname = "ERROR"`)
+  - **Time Debugger Logs**: Configurable number (default 100) of TIME_DEBUGGER [SLOW] logs (`[TIME_DEBUGGER] [SLOW]` in message)
+  - **Slow Request Logs**: Configurable number (default 100) of logs where `json.extra.request_time > threshold` (configurable threshold, default 1s)
 - **Search Field**: `json.hostname` (exact match on pod name using term queries)
+- **Configuration**: Document limits and slow request thresholds configurable via Elasticsearch Settings panel in UI
 
 ### 5. GrafanaService (Metrics & Dashboards)
 - **File**: `src/services/GrafanaService.ts`
@@ -210,6 +211,12 @@ interface ElasticLogEntry {
   environment?: string;
   applicationName?: string;
   requestTime?: number; // For slow request logs
+}
+
+interface ElasticSettings {
+  timeframeMinutes: number;    // Search timeframe (not yet implemented)
+  documentLimit: number;       // Number of documents to fetch per log type
+  slowRequestThreshold: number; // Threshold in seconds for slow requests
 }
 ```
 
@@ -376,7 +383,7 @@ examples/              # Example alert data
 
 ### Endpoints
 - `GET /api/health`: returns `{ github, openai, elasticsearch, grafana }` connectivity.
-- `POST /api/quick`: `{ alertname, pod }` → `ContextOutput` (with structured fields). Alert name is optional.
+- `POST /api/quick`: `{ alertname, pod, elasticSettings? }` → `ContextOutput` (with structured fields). Alert name is optional, elasticSettings configures document limits and thresholds.
 - `POST /api/alert`: `Alert` JSON → `ContextOutput`.
 
 ### NPM Scripts

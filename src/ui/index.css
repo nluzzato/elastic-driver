@@ -350,6 +350,423 @@ body {
   font-style: italic;
 }
 
+/* Uniform Design System - Buttons (matching elastic settings style) */
+.uniform-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  outline: none;
+  position: relative;
+}
+
+.uniform-button:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.uniform-button:disabled {
+  cursor: not-allowed;
+  background: #f5f5f5;
+  color: #a0a0a0;
+  border-color: #e0e0e0;
+  border-style: dashed;
+  box-shadow: none;
+  transform: none;
+  position: relative;
+}
+
+.uniform-button:disabled:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.05) 2px,
+    rgba(0,0,0,0.05) 4px
+  );
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
+.uniform-button-primary:disabled {
+  background: #f8f8f8;
+  color: #b0b0b0;
+  border-color: #d0d0d0;
+  border-style: dashed;
+}
+
+.uniform-button-secondary:disabled {
+  background: #fafafa;
+  color: #a8a8a8;
+  border-color: #d5d5d5;
+  border-style: dashed;
+}
+
+/* Uniform Button Sizes */
+.uniform-button-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.uniform-button-md {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.uniform-button-lg {
+  padding: 10px 20px;
+  font-size: 16px;
+}
+
+/* Uniform Button Variants */
+.uniform-button-primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.uniform-button-primary:hover:not(:disabled) {
+  background: var(--primary-hover, #1D4ED8);
+  border-color: var(--primary-hover, #1D4ED8);
+}
+
+.uniform-button-secondary {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.uniform-button-secondary:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--primary);
+}
+
+.uniform-button-danger {
+  background: var(--danger, #EF4444);
+  color: white;
+  border-color: var(--danger, #EF4444);
+}
+
+.uniform-button-danger:hover:not(:disabled) {
+  background: #DC2626;
+  border-color: #DC2626;
+}
+
+.uniform-button-ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: transparent;
+}
+
+.uniform-button-ghost:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+/* Uniform Button Content and Icons */
+.uniform-button-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.uniform-button-icon {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+}
+
+.uniform-button-loading .uniform-button-content {
+  opacity: 0.8;
+}
+
+.uniform-button-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Design System - Inputs */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.input-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+
+.input-label-text {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.input-label-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px var(--space-2);
+  border-radius: 12px;
+  background: var(--color-muted);
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input-label-badge.required {
+  background: var(--color-danger);
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  background: var(--color-bg);
+  color: var(--color-text);
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--color-info);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.input::placeholder {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.input-error {
+  border-color: var(--color-danger);
+}
+
+.input-error:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.input-with-left-icon {
+  padding-left: 44px;
+}
+
+.input-with-right-icon {
+  padding-right: 44px;
+}
+
+.input-icon {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.input-icon-left {
+  left: 0;
+}
+
+.input-icon-right {
+  right: 0;
+}
+
+.input-hint {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.input-error-text {
+  font-size: 12px;
+  color: var(--color-danger);
+  font-weight: 500;
+}
+
+/* Quick Run Styles (Legacy - will be replaced) */
+.quick-run-button {
+  background: linear-gradient(135deg, var(--color-info), #2563EB);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-5);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+  min-width: 140px;
+}
+
+.quick-run-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563EB, #1D4ED8);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+.quick-run-button:disabled {
+  background: var(--color-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.quick-run-button-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.quick-run-button-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.quick-run-icon {
+  font-size: 16px;
+}
+
+.quick-run-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.quick-run-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.input-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+
+.input-label-text {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.input-label-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px var(--space-2);
+  border-radius: 12px;
+  background: var(--color-muted);
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input-label-badge.required {
+  background: var(--color-danger);
+}
+
+.enhanced-input {
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  transition: all 0.2s ease;
+  background: var(--color-bg);
+}
+
+.enhanced-input:focus {
+  outline: none;
+  border-color: var(--color-info);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.enhanced-input::placeholder {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.input-hint {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.enhanced-skeleton {
+  height: 60px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: var(--radius);
+  margin-top: var(--space-4);
+}
+
+.quick-run-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius);
+  color: var(--color-danger);
+  font-size: 14px;
+  margin-top: var(--space-4);
+}
+
+.quick-run-error-icon {
+  font-size: 16px;
+}
+
 /* AI Prompt Settings Card */
 .ai-prompt-settings-card {
   background: var(--card);

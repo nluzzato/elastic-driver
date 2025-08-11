@@ -23,7 +23,7 @@ export class SimpleAlertService {
   /**
    * Process an alert and enrich it with GitHub expression data
    */
-  async processAlert(alert: Alert): Promise<ContextOutput> {
+  async processAlert(alert: Alert, elasticSettings?: { timeframeMinutes: number; documentLimit: number; slowRequestThreshold: number }): Promise<ContextOutput> {
     const alertname = alert.details?.alertname || 'Unknown';
     
     console.log(`🔍 Processing alert: ${alertname}`);
@@ -57,12 +57,17 @@ export class SimpleAlertService {
     const podName = alert.details?.pod;
     if (podName && this.elasticsearchService.isEnabled()) {
       try {
+        const limit = elasticSettings?.documentLimit || 100;
+        const slowThreshold = elasticSettings?.slowRequestThreshold || 1;
+        
+        console.log(`📊 Using Elasticsearch settings: ${limit} docs, ${slowThreshold}s slow threshold`);
+        
         // Fetch general logs, error logs, TIME_DEBUGGER logs, and slow request logs in parallel
         [logs, errorLogs, timeDebuggerLogs, slowRequestLogs] = await Promise.all([
-          this.elasticsearchService.getLastLogsForPod(podName, 100),
-          this.elasticsearchService.getLastLogsForPod(podName, 100, 'ERROR'),
-          this.elasticsearchService.getLastLogsForPod(podName, 100, undefined, '[TIME_DEBUGGER] [SLOW]'),
-          this.elasticsearchService.getLastSlowRequestLogsForPod(podName, 100, 1)
+          this.elasticsearchService.getLastLogsForPod(podName, limit),
+          this.elasticsearchService.getLastLogsForPod(podName, limit, 'ERROR'),
+          this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, '[TIME_DEBUGGER] [SLOW]'),
+          this.elasticsearchService.getLastSlowRequestLogsForPod(podName, limit, slowThreshold)
         ]);
       } catch (error) {
         console.warn('⚠️  Failed to fetch logs from Elasticsearch:', error);

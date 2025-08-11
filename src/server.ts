@@ -22,20 +22,27 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// Process quick alert: alertname + pod
+// Process quick alert: alertname (optional) + pod (required) + elasticsearch settings
 app.post('/api/quick', async (req, res) => {
-  const { alertname, pod } = req.body || {};
-  if (!alertname || !pod) {
-    return res.status(400).json({ error: 'alertname and pod are required' });
+  const { alertname, pod, elasticSettings } = req.body || {};
+  if (!pod) {
+    return res.status(400).json({ error: 'pod is required' });
   }
+
+  // Default elastic settings if not provided
+  const settings = {
+    timeframeMinutes: elasticSettings?.timeframeMinutes || 60,
+    documentLimit: elasticSettings?.documentLimit || 100,
+    slowRequestThreshold: elasticSettings?.slowRequestThreshold || 1
+  };
 
   const alert: Alert = {
     status: 'FIRING',
-    alertTitle: `${alertname} for`,
-    alert: `Alert triggered for ${alertname}`,
-    description: `Alert ${alertname} triggered on pod ${pod}`,
+    alertTitle: alertname ? `${alertname} for` : `Log analysis for`,
+    alert: alertname ? `Alert triggered for ${alertname}` : `Log analysis for ${pod}`,
+    description: alertname ? `Alert ${alertname} triggered on pod ${pod}` : `Log analysis for pod ${pod}`,
     details: {
-      alertname,
+      alertname: alertname || '',
       pod,
       container: 'unknown',
       ct_cluster: 'unknown',
@@ -48,7 +55,7 @@ app.post('/api/quick', async (req, res) => {
   try {
     validateConfig();
     const service = new SimpleAlertService(appConfig);
-    const context = await service.processAlert(alert);
+    const context = await service.processAlert(alert, settings);
     res.json(context);
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to process alert' });

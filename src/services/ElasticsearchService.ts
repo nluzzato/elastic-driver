@@ -180,7 +180,7 @@ export class ElasticsearchService {
   }
 
   /**
-   * Get the last logs with slow request times (json.request_time > threshold)
+   * Get the last logs with slow request times (json.extra.request_time > threshold)
    */
   async getLastSlowRequestLogsForPod(podName: string, limit: number = 100, thresholdSeconds: number = 1): Promise<LogEntry[]> {
     if (!this.enabled) {
@@ -215,15 +215,15 @@ export class ElasticsearchService {
               // Request time filter (greater than threshold)
               {
                 range: {
-                  'json.request_time': {
+                  'json.extra.request_time': {
                     gt: thresholdSeconds
                   }
                 }
               },
-              // Make sure json.request_time field exists
+              // Make sure json.extra.request_time field exists
               {
                 exists: {
-                  field: 'json.request_time'
+                  field: 'json.extra.request_time'
                 }
               }
             ]
@@ -245,7 +245,7 @@ export class ElasticsearchService {
           'json.service_name',
           'json.module',
           'json.environment',
-          'json.request_time',
+          'json.extra.request_time',
           'applicationName',
           'ct_deployment',
           'ct_feature',
@@ -255,20 +255,19 @@ export class ElasticsearchService {
 
       console.log('📡 Elasticsearch query:', JSON.stringify(searchQuery, null, 2));
 
-      const response = await fetch(`${this.config.url}/_search`, {
+      const response = await fetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}`
         },
-        body: JSON.stringify({
-          index: this.config.indexPattern,
-          ...searchQuery
-        })
+        body: JSON.stringify(searchQuery)
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ Elasticsearch error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -288,7 +287,7 @@ export class ElasticsearchService {
           module: source.json?.module,
           environment: source.json?.environment,
           applicationName: source.applicationName,
-          requestTime: source.json?.request_time // Include request time for display
+          requestTime: source.json?.extra?.request_time // Include request time for display
         };
       });
 
