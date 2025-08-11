@@ -1,7 +1,7 @@
 # Alert Context Agent - Project Specification
 
-**Version:** 1.0  
-**Last Updated:** 2025-08-10  
+**Version:** 1.2  
+**Last Updated:** 2025-08-11  
 **Target Audience:** LLM Systems (Claude, GPT, etc.) for codebase understanding  
 
 ## Project Overview
@@ -21,7 +21,8 @@ The Alert Context Agent is a Node.js/TypeScript service that provides comprehens
 ## Architecture Overview
 
 ```
-Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch Logs] → [Grafana Metrics] → [AI Analysis] → Enhanced Output
+Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch Logs] → [Grafana Metrics] → [AI Analysis]
+            → [REST API (Express)] → [Vite/React GUI]
 ```
 
 ### Data Flow
@@ -31,7 +32,7 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 4. **Log Fetching**: Parallel retrieval of 3 log types from Elasticsearch
 5. **Metrics Fetching**: Query Grafana/Prometheus for current values and trends
 6. **AI Analysis**: Comprehensive analysis using o3-mini model with metrics + logs
-7. **Output**: Formatted context with technical details, explanations, logs, metrics, and recommendations
+7. **Output**: Formatted context and structured fields (logs, explanations, analysis) returned via REST and rendered in GUI
 
 ## Core Services Architecture
 
@@ -180,6 +181,25 @@ interface ContextOutput {
   rule?: AlertRule;
   instanceDetails: Record<string, string>;
   formattedContext: string; // Human-readable formatted output
+  // Structured fields for GUI consumption
+  lastLogs?: ElasticLogEntry[];
+  lastErrorLogs?: ElasticLogEntry[];
+  lastSlowDebuggerLogs?: ElasticLogEntry[];
+  alertExpressionExplanation?: string;
+  analysisText?: string;
+}
+
+interface ElasticLogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  pod?: string;
+  container?: string;
+  namespace?: string;
+  service?: string;
+  module?: string;
+  environment?: string;
+  applicationName?: string;
 }
 ```
 
@@ -254,7 +274,11 @@ Based on the alert and logs, there are several indicators of system stress:
 ```json
 {
   "dotenv": "^16.0.0",        // Environment configuration
-  "openai": "^5.12.2"         // OpenAI SDK for AI services
+  "openai": "^5.12.2",        // OpenAI SDK for AI services
+  "express": "^4.19.2",       // REST API for GUI
+  "cors": "^2.8.5",           // CORS for local dev
+  "react": "^18.3.1",
+  "react-dom": "^18.3.1"
 }
 ```
 
@@ -263,7 +287,14 @@ Based on the alert and logs, there are several indicators of system stress:
 {
   "@types/node": "^20.19.10", // Node.js type definitions
   "ts-node": "^10.9.0",       // TypeScript execution
-  "typescript": "^5.0.0"      // TypeScript compiler
+  "typescript": "^5.0.0",     // TypeScript compiler
+  "@types/express": "^4.17.21",
+  "@types/cors": "^2.8.17",
+  "@types/react": "^18.3.3",
+  "@types/react-dom": "^18.3.0",
+  "vite": "^5.4.0",
+  "@vitejs/plugin-react": "^4.3.1",
+  "concurrently": "^9.0.1"
 }
 ```
 
@@ -292,16 +323,21 @@ Based on the alert and logs, there are several indicators of system stress:
 ### Project Structure
 ```
 src/
-├── config/           # Configuration management
-├── services/         # Core business logic services
-├── types/           # TypeScript type definitions
-├── utils/           # Utility functions
-├── run-simple.ts    # CLI tools
-├── run-alert.ts     # CLI tools
-└── index.ts         # Main entry point
+├── config/             # Configuration management
+├── services/           # Core business logic services
+├── types/              # TypeScript type definitions
+├── utils/              # Utility functions
+├── server.ts           # Express REST API for GUI
+├── ui/                 # Vite/React UI
+│   ├── index.html
+│   ├── main.tsx
+│   └── screens/App.tsx
+├── run-simple.ts       # CLI tools
+├── run-alert.ts        # CLI tools
+└── index.ts            # Main entry point
 
-.docs/               # Project documentation
-examples/            # Example alert data
+.docs/                 # Project documentation
+examples/              # Example alert data
 ```
 
 ### TypeScript Configuration
@@ -316,6 +352,23 @@ examples/            # Example alert data
 - **Error Boundaries**: Services handle their own failures gracefully
 - **Async/Await**: Consistent async pattern throughout
 - **Parallel Processing**: Multiple data sources fetched simultaneously
+ - **UI Separation**: `src/ui` for GUI, `src/server.ts` for API
+
+## GUI & API
+
+- GUI: Vite + React app under `src/ui`.
+- API: Express server (`src/server.ts`) exposing REST endpoints consumed by the GUI.
+
+### Endpoints
+- `GET /api/health`: returns `{ github, openai, elasticsearch }` connectivity.
+- `POST /api/quick`: `{ alertname, pod }` → `ContextOutput` (with structured fields).
+- `POST /api/alert`: `Alert` JSON → `ContextOutput`.
+
+### NPM Scripts
+- `server`: start API only
+- `gui:dev`: run API and Vite dev server concurrently
+- `gui:build`: build the UI
+- `gui:preview`: preview UI build
 
 ## Future Architecture Considerations
 
@@ -360,3 +413,48 @@ When working with this codebase as an LLM:
 6. **Evolution**: Update this specification when making architectural changes
 
 The project follows a **pipeline pattern** where each service adds enrichment data, culminating in a comprehensive alert context that helps teams respond effectively to production issues.
+
+---
+
+## UI/UX Design Brief (Executive Summary)
+
+This brief defines the visual language, interaction patterns, and performance goals for the GUI so any agent can implement a beautiful and efficient experience without ambiguity. The full execution details live in `@gui-architecture.md` under “UI/UX Implementation Requirements”.
+
+### Core UX Goals
+- Clarity under pressure: first screen must answer “what’s wrong, where, why, what next?” in under 10 seconds.
+- Trustworthy data: clear provenance for rules, logs, and metrics with links back to sources.
+- Fast and responsive: render skeletons in <100ms, first meaningful paint <1s on modern laptops, virtualized long lists.
+
+### Primary Screen Layout
+- Header: Alert title, status pill, namespace/pod, quick actions (copy, link to Grafana/GitHub).
+- Two-column content on desktop (stacked on mobile):
+  - Left: Expression Details, AI Explanation, AI Analysis & Recommendations.
+  - Right: Service Health, Logs (General, Error, Slow), Instance Details.
+- Sticky context bar when scrolling with alertname, pod, and status.
+
+### Design System Tokens
+- Colors (semantic, theme-ready):
+  - success: #10B981, warning: #F59E0B, danger: #EF4444, info: #3B82F6, surface: #0B1220 (dark) / #FFFFFF (light), border: rgba(148,163,184,0.24).
+- Typography: Inter or system stack; sizes 12/14/16/20/24 with 1.4–1.6 line-height.
+- Spacing scale: 4/8/12/16/24/32/48.
+- Radius: 8 default; 12 for primary cards.
+- Elevation: shadows 0/1/2; avoid heavy drop shadows.
+
+### Components (must be reusable)
+- StatPill (status, severity), SectionCard (title, actions, body), KeyValueGrid (two-column responsive), LogTable (virtualized, copy-to-clipboard per row), CodeBlock (wrap + copy), SourceLink (icon + label), EmptyState, ErrorState, Skeletons.
+
+### States
+- Loading: skeletons for each card; never blank screens.
+- Empty: neutral illustrations/messages with next-steps.
+- Error: actionable text with retry and underlying error detail in a collapsible area.
+
+### Accessibility
+- Keyboard navigable, visible focus, aria-live for async loads, color contrast AA.
+
+### Performance Budget
+- DOM nodes <3k on initial view; lists virtualized; images/svg under 150KB total; avoid blocking network waterfalls; concurrent fetch where possible.
+
+### Non-goals
+- Do not introduce a large UI framework; prefer CSS variables and minimal utilities over heavy dependencies.
+
+See `@gui-architecture.md` for concrete acceptance criteria and implementation steps.

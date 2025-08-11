@@ -13,7 +13,7 @@ export const config: Config = {
   openai: {
     apiKey: process.env.OPEN_AI_KEY,
   },
-    elasticsearch: {
+  elasticsearch: {
     url: process.env.ELASTICSEARCH_URL,
     username: process.env.ELASTICSEARCH_USERNAME,
     password: process.env.ELASTICSEARCH_PASSWORD,
@@ -52,7 +52,8 @@ export const validateConfig = (): void => {
     console.warn('   Log fetching will be disabled');
   }
 
-  if (!config.grafana.url || !config.grafana.apiKey) {
+  // Grafana is optional for now
+  if (!config.grafana || !config.grafana.url || !config.grafana.apiKey) {
     console.warn('⚠️  GRAFANA_URL or GRAFANA_API_KEY not found in environment variables');
     console.warn('   Metrics fetching will be disabled');
   }

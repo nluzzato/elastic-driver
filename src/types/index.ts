@@ -104,7 +104,7 @@ export interface Config {
     indexPattern: string;
     timeout: number;
   };
-  grafana: {
+  grafana?: {
     url?: string;
     apiKey?: string;
     timeout: number;
@@ -122,7 +122,12 @@ export interface ContextOutput {
   url?: string;
   rule?: AlertRule;
   instanceDetails: Record<string, string>;
-  formattedContext: string;
+  // Structured fields for GUI consumption
+  lastLogs?: ElasticLogEntry[];
+  lastErrorLogs?: ElasticLogEntry[];
+  lastSlowDebuggerLogs?: ElasticLogEntry[];
+  alertExpressionExplanation?: string;
+  analysisText?: string;
 }
 
 // Simple types only - no complex pipeline types
@@ -171,4 +176,20 @@ export interface MetricsContext {
     end: Date;
     duration: string;
   };
+}
+
+// Log entry shape for UI consumption
+export interface ElasticLogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  pod?: string;
+  container?: string;
+  namespace?: string;
+  source?: string;
+  service?: string;
+  module?: string;
+  environment?: string;
+  applicationName?: string;
+  [key: string]: any;
 }

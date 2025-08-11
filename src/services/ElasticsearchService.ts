@@ -49,8 +49,20 @@ export class ElasticsearchService {
 
       const mustFilters: any[] = [
         {
-          match: {
-            'json.hostname': podName
+          bool: {
+            should: [
+              {
+                term: {
+                  'json.hostname.keyword': podName
+                }
+              },
+              {
+                term: {
+                  'json.hostname': podName
+                }
+              }
+            ],
+            minimum_should_match: 1
           }
         }
       ];
@@ -58,8 +70,8 @@ export class ElasticsearchService {
       // Add log level filter if specified
       if (logLevel) {
         mustFilters.push({
-          match: {
-            'json.levelname': logLevel
+          term: {
+            'json.levelname.keyword': logLevel
           }
         });
       }
@@ -186,8 +198,20 @@ export class ElasticsearchService {
           bool: {
             must: [
               {
-                match: {
-                  'json.hostname': podName
+                bool: {
+                  should: [
+                    {
+                      term: {
+                        'json.hostname.keyword': podName
+                      }
+                    },
+                    {
+                      term: {
+                        'json.hostname': podName
+                      }
+                    }
+                  ],
+                  minimum_should_match: 1
                 }
               },
               {

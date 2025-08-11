@@ -38,7 +38,7 @@ export class OpenAIQueryService {
         messages: [
           {
             role: 'system',
-            content: 'You are a Prometheus and observability expert. Explain Prometheus queries in clear, simple language that anyone can understand. Focus on what the query measures, when it would trigger, and what it means for the system.'
+            content: 'You are a Prometheus expert explaining PromQL to experienced software engineers. Be concise and technical. Focus on: what metric is being measured, the threshold/condition that triggers the alert, and the immediate system impact. Assume familiarity with observability concepts.'
           },
           {
             role: 'user',
@@ -158,21 +158,26 @@ Please analyze:
 3. What should the team investigate first?
 4. Are there patterns or anomalies in the timing/performance data?
 
-Provide a clear assessment and actionable recommendations.`;
+Provide a clear assessment and actionable recommendations. Format your response using markdown with:
+- ## headers for main sections
+- **bold** for important points
+- bullet points for lists
+- \`code blocks\` for technical details or log snippets
+- Clear, structured analysis that's easy to scan`;
 
       const completion = await this.openai.chat.completions.create({
         model: 'o3-mini',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert Site Reliability Engineer with deep knowledge of distributed systems, performance analysis, and incident response. Analyze alerts and logs to identify root causes and provide actionable insights.'
+            content: 'You are an SRE analyzing production issues for experienced engineers. Be concise and technical. Correlate alert data with logs to identify root causes and provide actionable next steps. Use markdown formatting: ## headers, **bold** for key points, `code` for technical details. Skip basic explanations - focus on analysis and solutions.'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_completion_tokens: 800,
+        max_completion_tokens: 2500,
       });
 
       const analysis = completion.choices[0]?.message?.content?.trim();
