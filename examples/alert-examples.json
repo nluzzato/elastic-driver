@@ -1,0 +1,41 @@
+{
+  "real_alert": {
+    "status": "RESOLVED",
+    "alertTitle": "ContainerCPUThrotellingIsHigh for",
+    "alert": "A process has been experienced elevated CPU throttling.",
+    "description": "The process in the container pymobiengine on pod pymobiengine-company-policy-6ff6cc49dd-jk76x has 14.05% throttling of CPU",
+    "details": {
+      "alertname": "ContainerCPUThrotellingIsHigh",
+      "container": "pymobiengine",
+      "ct_cluster": "app.production",
+      "namespace": "default",
+      "pod": "pymobiengine-company-policy-6ff6cc49dd-jk76x",
+      "target": "slack",
+      "team": "time-clock"
+    }
+  },
+  "simple_test": {
+    "status": "FIRING",
+    "alert": "Test alert",
+    "description": "This is a test alert",
+    "details": {
+      "alertname": "TestAlert",
+      "container": "test-container",
+      "namespace": "test"
+    }
+  },
+  "memory_alert": {
+    "status": "FIRING",
+    "alert": "High memory usage detected",
+    "description": "Container memory usage is above threshold",
+    "details": {
+      "alertname": "HighMemoryUsage",
+      "container": "web-server",
+      "ct_cluster": "production",
+      "namespace": "default",
+      "pod": "web-server-abc123",
+      "target": "slack",
+      "team": "backend"
+    }
+  }
+}
