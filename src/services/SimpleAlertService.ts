@@ -119,7 +119,13 @@ export class SimpleAlertService {
     
     // Get AI analysis of logs if we have data (with or without alert explanation)
     let aiAnalysis: string | undefined;
-    if (this.openaiService.isEnabled() && (logs.length > 0 || errorLogs.length > 0 || timeDebuggerLogs.length > 0 || slowRequestLogs.length > 0)) {
+    console.log(`🤖 AI Analysis check: OpenAI enabled: ${this.openaiService.isEnabled()}, logs: ${logs.length}, errors: ${errorLogs.length}, time: ${timeDebuggerLogs.length}, slow: ${slowRequestLogs.length}`);
+    
+    // For reset investigation, always try to provide analysis even with 0 logs since the commit/PR info is valuable
+    const hasLogsOrIsResetInvestigation = (logs.length > 0 || errorLogs.length > 0 || timeDebuggerLogs.length > 0 || slowRequestLogs.length > 0) || 
+                                          (specialBehavior === PresetBehavior.RESET_INVESTIGATION && resetInvestigationData?.found);
+    
+    if (this.openaiService.isEnabled() && hasLogsOrIsResetInvestigation) {
       try {
         // For reset investigation, include commit and PR information in the analysis
         if (specialBehavior === PresetBehavior.RESET_INVESTIGATION && resetInvestigationData?.found) {
@@ -162,8 +168,11 @@ export class SimpleAlertService {
       } catch (error) {
         console.warn('⚠️  Failed to get OpenAI analysis:', error);
       }
+    } else {
+      console.log(`ℹ️  Skipping AI analysis: enabled=${this.openaiService.isEnabled()}, hasLogs=${hasLogsOrIsResetInvestigation}`);
     }
     
+    console.log(`📦 Creating context output...`);
     // Create context output
     const context: ContextOutput = {
       alertname,
