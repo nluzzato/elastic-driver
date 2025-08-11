@@ -41,17 +41,16 @@ export const RequestTraceModal: React.FC<RequestTraceModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
 
-  // Fetch request trace data when modal opens
+  // Reset state when modal closes
   useEffect(() => {
-    if (isOpen && requestId) {
-      fetchRequestTrace();
-    } else if (!isOpen) {
-      // Reset state when modal closes
+    if (!isOpen) {
       setTraceData(null);
       setDebugPrompt('');
       setError(null);
+      setLoading(false);
+      setGeneratingPrompt(false);
     }
-  }, [isOpen, requestId]);
+  }, [isOpen]);
 
   const fetchRequestTrace = async () => {
     setLoading(true);
@@ -132,79 +131,149 @@ export const RequestTraceModal: React.FC<RequestTraceModalProps> = ({
         </div>
 
         <div className="modal-body">
-          <div className="request-info">
-            <h3>Request ID: <code>{requestId}</code></h3>
-            {traceData?.timeRange && (
-              <p className="time-range">
-                <span className="time-label">Time Range:</span>
-                <span className="time-value">
-                  {formatTimestamp(traceData.timeRange.start)} → {formatTimestamp(traceData.timeRange.end)}
-                </span>
-              </p>
-            )}
-          </div>
-
-          {loading && (
-            <div className="loading-section">
-              <div className="skeleton enhanced-skeleton" />
-              <p>Fetching request trace...</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="error-section">
-              <span className="error-icon">⚠️</span>
-              {error}
-            </div>
-          )}
-
-          {traceData && (
-            <>
-              <div className="trace-summary">
-                <h4>📊 Trace Summary</h4>
-                <div className="summary-stats">
-                  <span className="stat">
-                    <strong>{traceData.documentCount}</strong> documents
-                  </span>
-                  {traceData.timeRange && (
-                    <span className="stat">
-                      <strong>{Math.round((new Date(traceData.timeRange.end).getTime() - new Date(traceData.timeRange.start).getTime()) / 1000)}s</strong> duration
-                    </span>
-                  )}
+          {/* Initial State - Show request ID and fetch button */}
+          {!traceData && !loading && !error && (
+            <div className="initial-state">
+              <div className="request-info-card">
+                <div className="request-id-section">
+                  <h3>📍 Request Trace Analysis</h3>
+                  <div className="request-id-display">
+                    <span className="request-id-label">Request ID:</span>
+                    <code className="request-id-value">{requestId}</code>
+                  </div>
+                  <p className="request-description">
+                    Analyze the complete flow of this request across all services and timeframes to understand 
+                    what happened and generate debugging context for development.
+                  </p>
                 </div>
+                
+                <div className="fetch-section">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={fetchRequestTrace}
+                    leftIcon="🔍"
+                  >
+                    Fetch Request Trace
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {loading && (
+            <div className="loading-state">
+              <div className="loading-spinner">
+                <div className="spinner"></div>
+              </div>
+              <h3>🔍 Analyzing Request Flow</h3>
+              <p>Searching for all logs related to request <code>{requestId}</code>...</p>
+              <div className="loading-steps">
+                <div className="loading-step">📡 Querying Elasticsearch</div>
+                <div className="loading-step">⏱️ Sorting by timeline</div>
+                <div className="loading-step">🔗 Building request flow</div>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <div className="error-state">
+              <div className="error-icon">⚠️</div>
+              <h3>Request Trace Failed</h3>
+              <p className="error-message">{error}</p>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={fetchRequestTrace}
+                leftIcon="🔄"
+              >
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {/* Results State */}
+          {traceData && (
+            <div className="results-state">
+              {/* Header with summary */}
+              <div className="trace-header">
+                <div className="trace-title">
+                  <h3>📊 Request Flow Analysis</h3>
+                  <div className="trace-meta">
+                    <span className="trace-stat">
+                      <strong>{traceData.documentCount}</strong> events
+                    </span>
+                    {traceData.timeRange && (
+                      <span className="trace-stat">
+                        <strong>{Math.round((new Date(traceData.timeRange.end).getTime() - new Date(traceData.timeRange.start).getTime()) / 1000)}s</strong> duration
+                      </span>
+                    )}
+                    <span className="trace-period">
+                      {traceData.timeRange && `${formatTimestamp(traceData.timeRange.start)} → ${formatTimestamp(traceData.timeRange.end)}`}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setTraceData(null);
+                    setDebugPrompt('');
+                    setError(null);
+                  }}
+                  leftIcon="🔄"
+                >
+                  New Search
+                </Button>
               </div>
 
               {traceData.documents.length === 0 ? (
-                <div className="no-documents">
-                  <p>No documents found for this request ID.</p>
+                <div className="no-results">
+                  <div className="no-results-icon">🔍</div>
+                  <h4>No Events Found</h4>
+                  <p>No log entries were found for request ID <code>{requestId}</code></p>
                   {traceData.message && <p className="hint">{traceData.message}</p>}
                 </div>
               ) : (
                 <>
-                  <div className="documents-section">
-                    <h4>📋 Request Flow ({traceData.documents.length} documents)</h4>
-                    <div className="documents-list">
+                  {/* Timeline of events */}
+                  <div className="timeline-section">
+                    <h4>🕐 Request Timeline</h4>
+                    <div className="timeline-container">
                       {traceData.documents.map((doc, index) => (
-                        <div key={index} className="document-item">
-                          <div className="doc-header">
-                            <span className="doc-index">{index + 1}</span>
-                            <span className="doc-timestamp">{formatTimestamp(doc['@timestamp'])}</span>
-                            <span className="doc-level">{doc.json?.levelname || 'INFO'}</span>
+                        <div key={index} className="timeline-event">
+                          <div className="timeline-marker">
+                            <div className="timeline-dot"></div>
+                            {index < traceData.documents.length - 1 && <div className="timeline-line"></div>}
                           </div>
-                          <div className="doc-content">
-                            <div className="doc-message">{doc.json?.message || 'No message'}</div>
-                            {doc.json?.service_name && <div className="doc-service">Service: {doc.json.service_name}</div>}
-                            {doc.json?.module && <div className="doc-module">Module: {doc.json.module}</div>}
-                            {doc.json?.extra?.request_time && <div className="doc-timing">Request Time: {doc.json.extra.request_time}s</div>}
+                          <div className="timeline-content">
+                            <div className="event-header">
+                              <span className="event-time">{formatTimestamp(doc['@timestamp'])}</span>
+                              <span className={`event-level ${(doc.json?.levelname || 'INFO').toLowerCase()}`}>
+                                {doc.json?.levelname || 'INFO'}
+                              </span>
+                              {doc.json?.extra?.request_time && (
+                                <span className="event-timing">{doc.json.extra.request_time}s</span>
+                              )}
+                            </div>
+                            <div className="event-message">{doc.json?.message || 'No message'}</div>
+                            <div className="event-meta">
+                              {doc.json?.service_name && <span className="event-service">{doc.json.service_name}</span>}
+                              {doc.json?.module && <span className="event-module">{doc.json.module}</span>}
+                              {doc.json?.hostname && <span className="event-pod">{doc.json.hostname}</span>}
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="debug-prompt-section">
-                    <div className="section-header">
-                      <h4>🤖 Generate Debugging Prompt for Cursor</h4>
+                  {/* AI Debug Prompt Generation */}
+                  <div className="ai-section">
+                    <div className="ai-header">
+                      <h4>🤖 Generate Debug Prompt</h4>
                       <Button
                         variant="secondary"
                         size="sm"
@@ -215,38 +284,35 @@ export const RequestTraceModal: React.FC<RequestTraceModalProps> = ({
                     </div>
 
                     {showCustomPrompt && (
-                      <div className="custom-prompt-section">
-                        <label htmlFor="customPrompt" className="custom-prompt-label">
-                          System Prompt for AI Analysis:
-                        </label>
+                      <div className="custom-prompt-card">
+                        <label className="prompt-label">Custom Analysis Prompt:</label>
                         <textarea
-                          id="customPrompt"
-                          className="custom-prompt-input"
+                          className="prompt-textarea"
                           value={customPrompt}
                           onChange={(e) => setCustomPrompt(e.target.value)}
-                          rows={6}
-                          placeholder="Enter custom prompt for the AI analysis..."
+                          rows={4}
+                          placeholder="Customize how the AI should analyze this request flow..."
                         />
                       </div>
                     )}
 
-                    <div className="generate-section">
+                    <div className="ai-actions">
                       <Button
                         variant="primary"
                         size="md"
                         onClick={generateDebugPrompt}
                         disabled={generatingPrompt}
                         isLoading={generatingPrompt}
-                        leftIcon="🔍"
+                        leftIcon="⚡"
                       >
-                        Generate Contextual Prompt for Cursor
+                        Generate Cursor Debug Prompt
                       </Button>
                     </div>
 
                     {debugPrompt && (
-                      <div className="debug-prompt-result">
-                        <div className="result-header">
-                          <h5>Generated Debug Prompt:</h5>
+                      <div className="prompt-result">
+                        <div className="prompt-result-header">
+                          <h5>📋 Generated Debug Prompt</h5>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -256,7 +322,7 @@ export const RequestTraceModal: React.FC<RequestTraceModalProps> = ({
                             Copy to Clipboard
                           </Button>
                         </div>
-                        <div className="debug-prompt-content">
+                        <div className="prompt-content">
                           <ReactMarkdown>{debugPrompt}</ReactMarkdown>
                         </div>
                       </div>
@@ -264,7 +330,7 @@ export const RequestTraceModal: React.FC<RequestTraceModalProps> = ({
                   </div>
                 </>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
