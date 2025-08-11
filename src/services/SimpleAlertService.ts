@@ -2,6 +2,7 @@ import { Alert, Config, ContextOutput } from '../types';
 import { GitHubService } from './GitHubService';
 import { OpenAIQueryService } from './OpenAIQueryService';
 import { ElasticsearchService, LogEntry } from './ElasticsearchService';
+import { GrafanaService } from './GrafanaService';
 
 /**
  * Simple Alert Service - Just GitHub expression enrichment
@@ -10,11 +11,13 @@ export class SimpleAlertService {
   private githubService: GitHubService;
   private openaiService: OpenAIQueryService;
   private elasticsearchService: ElasticsearchService;
+  private grafanaService: GrafanaService;
 
   constructor(config: Config) {
     this.githubService = new GitHubService(config);
     this.openaiService = new OpenAIQueryService(config);
     this.elasticsearchService = new ElasticsearchService(config);
+    this.grafanaService = new GrafanaService(config);
   }
 
   /**
@@ -50,30 +53,33 @@ export class SimpleAlertService {
     let logs: LogEntry[] = [];
     let errorLogs: LogEntry[] = [];
     let timeDebuggerLogs: LogEntry[] = [];
+    let slowRequestLogs: LogEntry[] = [];
     const podName = alert.details?.pod;
     if (podName && this.elasticsearchService.isEnabled()) {
       try {
-        // Fetch general logs, error logs, and SLOW TIME_DEBUGGER logs in parallel
-        [logs, errorLogs, timeDebuggerLogs] = await Promise.all([
+        // Fetch general logs, error logs, TIME_DEBUGGER logs, and slow request logs in parallel
+        [logs, errorLogs, timeDebuggerLogs, slowRequestLogs] = await Promise.all([
           this.elasticsearchService.getLastLogsForPod(podName, 100),
           this.elasticsearchService.getLastLogsForPod(podName, 100, 'ERROR'),
-          this.elasticsearchService.getLastLogsForPod(podName, 100, undefined, '[TIME_DEBUGGER] [SLOW]')
+          this.elasticsearchService.getLastLogsForPod(podName, 100, undefined, '[TIME_DEBUGGER] [SLOW]'),
+          this.elasticsearchService.getLastSlowRequestLogsForPod(podName, 100, 1)
         ]);
       } catch (error) {
         console.warn('⚠️  Failed to fetch logs from Elasticsearch:', error);
       }
     }
     
-    // Get AI analysis of alert + logs if we have data
+    // Get AI analysis of logs if we have data (with or without alert explanation)
     let aiAnalysis: string | undefined;
-    if (aiExplanation && this.openaiService.isEnabled() && (logs.length > 0 || errorLogs.length > 0 || timeDebuggerLogs.length > 0)) {
+    if (this.openaiService.isEnabled() && (logs.length > 0 || errorLogs.length > 0 || timeDebuggerLogs.length > 0 || slowRequestLogs.length > 0)) {
       try {
         aiAnalysis = await this.openaiService.analyzeAlertWithLogs(
           alertname,
-          aiExplanation,
+          aiExplanation, // Can be undefined if no alert found
           logs,
           errorLogs,
-          timeDebuggerLogs
+          timeDebuggerLogs,
+          slowRequestLogs
         );
       } catch (error) {
         console.warn('⚠️  Failed to get OpenAI analysis:', error);
@@ -94,7 +100,8 @@ export class SimpleAlertService {
 
       lastLogs: logs,
       lastErrorLogs: errorLogs,
-      lastSlowDebuggerLogs: timeDebuggerLogs,
+      lastTimeDebuggerLogs: timeDebuggerLogs,
+      lastSlowRequestLogs: slowRequestLogs,
       alertExpressionExplanation: aiExplanation,
       analysisText: aiAnalysis
     };
@@ -112,16 +119,17 @@ export class SimpleAlertService {
   }
 
   /**
-   * Test all services (GitHub + OpenAI + Elasticsearch)
+   * Test all services (GitHub + OpenAI + Elasticsearch + Grafana)
    */
-  async fullHealthCheck(): Promise<{ github: boolean; openai: boolean; elasticsearch: boolean }> {
-    const [github, openai, elasticsearch] = await Promise.all([
+  async fullHealthCheck(): Promise<{ github: boolean; openai: boolean; elasticsearch: boolean; grafana: boolean }> {
+    const [github, openai, elasticsearch, grafana] = await Promise.all([
       this.githubService.testRepositoryAccess(),
       this.openaiService.healthCheck(),
-      this.elasticsearchService.healthCheck()
+      this.elasticsearchService.healthCheck(),
+      this.grafanaService.healthCheck()
     ]);
 
-    return { github, openai, elasticsearch };
+    return { github, openai, elasticsearch, grafana };
   }
 
 

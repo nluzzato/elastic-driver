@@ -125,7 +125,8 @@ export interface ContextOutput {
   // Structured fields for GUI consumption
   lastLogs?: ElasticLogEntry[];
   lastErrorLogs?: ElasticLogEntry[];
-  lastSlowDebuggerLogs?: ElasticLogEntry[];
+  lastTimeDebuggerLogs?: ElasticLogEntry[];
+  lastSlowRequestLogs?: ElasticLogEntry[];
   alertExpressionExplanation?: string;
   analysisText?: string;
 }
@@ -137,36 +138,9 @@ export type SeverityLevel = 'critical' | 'warning' | 'info';
 export type AlertStatus = 'FIRING' | 'RESOLVED';
 export type SearchSource = 'github' | 'mock' | 'error' | 'none';
 
-// Grafana/Prometheus types
-export interface MetricValue {
-  timestamp: number;
-  value: string;
-}
-
-export interface MetricSeries {
-  metric: Record<string, string>;
-  values?: MetricValue[];
-  value?: MetricValue;
-}
-
-export interface PrometheusQueryResult {
-  status: 'success' | 'error';
-  data: {
-    resultType: 'matrix' | 'vector' | 'scalar' | 'string';
-    result: MetricSeries[];
-  };
-  error?: string;
-}
-
-export interface GrafanaMetricData {
-  query: string;
-  currentValue?: number;
-  threshold?: number;
-  unit?: string;
-  trend?: 'up' | 'down' | 'stable';
-  percentageChange?: number;
-  dashboardUrl?: string;
-}
+// Grafana/Prometheus types (moved to GrafanaService.ts)
+// Re-export for backwards compatibility
+export type { MetricValue, MetricSeries, PrometheusQueryResult, GrafanaMetricData } from '../services/GrafanaService';
 
 export interface MetricsContext {
   alertMetric?: GrafanaMetricData;

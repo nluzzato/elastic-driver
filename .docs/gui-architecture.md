@@ -13,7 +13,7 @@ This document describes the GUI architecture, how it interacts with the existing
 - File: `src/server.ts`
 - Stack: Express with CORS + JSON middleware.
 - Endpoints:
-  - `GET /api/health`: Calls `SimpleAlertService.fullHealthCheck()` and returns `{ github, openai, elasticsearch }` service connectivity.
+  - `GET /api/health`: Calls `SimpleAlertService.fullHealthCheck()` and returns `{ github, openai, elasticsearch, grafana }` service connectivity.
   - `POST /api/quick`: Accepts `{ alertname, pod }` and constructs a minimal `Alert`, then calls `SimpleAlertService.processAlert()` and returns the resulting `ContextOutput`.
   - `POST /api/alert`: Accepts a full `Alert` JSON payload and returns the resulting `ContextOutput`.
 
@@ -26,7 +26,7 @@ The server uses the existing configuration loader `src/config/index.ts` and does
 - Screen: `src/ui/screens/App.tsx`
 
 The `App` screen provides:
-- Service Health panel: Calls `/api/health` and displays connectivity status for GitHub, OpenAI, Elasticsearch.
+- Service Health panel: Calls `/api/health` and displays connectivity status for GitHub, OpenAI, Elasticsearch, Grafana.
 - Quick Run form: `alertname` + `pod` to invoke `/api/quick`. The response renders both structured fields and the `formattedContext` string from the orchestrator.
 
 ### API Response Shape for GUI

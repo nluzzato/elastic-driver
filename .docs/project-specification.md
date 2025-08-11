@@ -41,7 +41,7 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 - **Purpose**: Coordinates all enrichment services and formats final output
 - **Key Methods**:
   - `processAlert(alert: Alert)`: Main processing pipeline
-  - `formatContext()`: Generates human-readable output
+  
   - `fullHealthCheck()`: Tests all service connectivity
 
 ### 2. GitHubService (Alert Definitions)
@@ -74,17 +74,23 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
   - **General Logs**: Last 100 general application logs
   - **Error Logs**: Last 100 ERROR-level logs (`json.levelname = "ERROR"`)
   - **Performance Logs**: Last 100 TIME_DEBUGGER [SLOW] logs (`[TIME_DEBUGGER] [SLOW]` in message)
-- **Search Field**: `json.hostname` (matches pod name)
+- **Search Field**: `json.hostname` (exact match on pod name)
 
 ### 5. GrafanaService (Metrics & Dashboards)
 - **File**: `src/services/GrafanaService.ts`
 - **Purpose**: Fetches Prometheus metrics and dashboard context via Grafana API
-- **Implementation**: Grafana HTTP API with API Key authentication
+- **Implementation**: Grafana HTTP API with Bearer token authentication
+- **Key Methods**:
+  - `queryMetric()`: Queries current Prometheus metric values
+  - `queryRange()`: Queries historical data for trends
+  - `getAlertMetricData()`: Gets current value and trend for alert expression
+  - `getRelatedMetrics()`: Fetches CPU, memory, network metrics for pod
+  - `healthCheck()`: Tests API connectivity
 - **Metrics Retrieved**:
-  - **Alert Metric**: Current value of the alerting metric
-  - **Related Metrics**: CPU, memory, network, disk for the pod/container
-  - **Trend Data**: Historical values to show if issue is escalating
-- **Dashboard Context**: Links to relevant Grafana dashboards
+  - **Alert Metric**: Current value of the alerting metric with trend analysis
+  - **Related Metrics**: CPU usage, memory usage, network TX/RX for pod
+  - **Trend Data**: 30-minute historical data to determine if metrics are stable/up/down
+- **Dashboard Context**: Auto-generated links to relevant Grafana dashboards
 
 ## Data Sources
 
@@ -180,7 +186,7 @@ interface ContextOutput {
   url?: string;
   rule?: AlertRule;
   instanceDetails: Record<string, string>;
-  formattedContext: string; // Human-readable formatted output
+
   // Structured fields for GUI consumption
   lastLogs?: ElasticLogEntry[];
   lastErrorLogs?: ElasticLogEntry[];

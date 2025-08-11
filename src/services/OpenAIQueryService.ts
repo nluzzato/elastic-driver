@@ -124,10 +124,11 @@ export class OpenAIQueryService {
    */
   async analyzeAlertWithLogs(
     alertname: string,
-    alertExplanation: string,
+    alertExplanation: string | undefined,
     generalLogs: any[],
     errorLogs: any[],
-    timeDebuggerLogs: any[]
+    timeDebuggerLogs: any[],
+    slowRequestLogs?: any[]
   ): Promise<string> {
     if (!this.enabled || !this.openai) {
       return 'OpenAI service not available - cannot perform analysis';
@@ -136,12 +137,24 @@ export class OpenAIQueryService {
     try {
       console.log('🔍 Asking OpenAI to analyze alert with logs...');
 
-      const prompt = `You are an expert SRE analyzing a production alert. Given the alert explanation and recent logs, analyze if there's something wrong and provide actionable insights.
+      let prompt = `You are an expert SRE analyzing production logs and potential issues. `;
+      
+      if (alertExplanation) {
+        prompt += `Given the alert explanation and recent logs, analyze if there's something wrong and provide actionable insights.
 
 ALERT: ${alertname}
 
 ALERT EXPLANATION:
-${alertExplanation}
+${alertExplanation}`;
+      } else {
+        prompt += `Analyze the recent logs to identify patterns, issues, or anomalies that might need attention.
+
+SYSTEM/POD: ${alertname}
+
+No specific alert triggered - performing general log analysis.`;
+      }
+
+      prompt += `
 
 RECENT GENERAL LOGS (last 5):
 ${generalLogs.slice(0, 5).map(log => `[${new Date(log.timestamp).toLocaleTimeString()}] ${log.level}: ${log.message}`).join('\n')}
@@ -150,13 +163,38 @@ RECENT ERROR LOGS (last 10):
 ${errorLogs.slice(0, 10).map(log => `[${new Date(log.timestamp).toLocaleTimeString()}] ${log.message}`).join('\n')}
 
 RECENT PERFORMANCE LOGS (last 10):
-${timeDebuggerLogs.slice(0, 10).map(log => `[${new Date(log.timestamp).toLocaleTimeString()}] ${log.message}`).join('\n')}
+${timeDebuggerLogs.slice(0, 10).map(log => `[${new Date(log.timestamp).toLocaleTimeString()}] ${log.message}`).join('\n')}`;
+
+      // Add slow request logs if provided
+      if (slowRequestLogs && slowRequestLogs.length > 0) {
+        prompt += `
+
+RECENT SLOW REQUEST LOGS (>1s, last 10):
+${slowRequestLogs.slice(0, 10).map(log => {
+  const requestTime = log.requestTime ? ` (${log.requestTime}s)` : '';
+  return `[${new Date(log.timestamp).toLocaleTimeString()}]${requestTime} ${log.message}`;
+}).join('\n')}`;
+      }
+
+      if (alertExplanation) {
+        prompt += `
 
 Please analyze:
 1. Is there evidence of issues in the logs that correlate with the alert?
 2. What are the potential root causes?
 3. What should the team investigate first?
-4. Are there patterns or anomalies in the timing/performance data?
+4. Are there patterns or anomalies in the timing/performance data?`;
+      } else {
+        prompt += `
+
+Please analyze:
+1. Are there any error patterns or anomalies in the logs?
+2. What potential issues or bottlenecks can you identify?
+3. What should the team investigate or monitor?
+4. Are there performance optimizations to consider?`;
+      }
+
+      prompt += `
 
 Provide a clear assessment and actionable recommendations. Format your response using markdown with:
 - ## headers for main sections

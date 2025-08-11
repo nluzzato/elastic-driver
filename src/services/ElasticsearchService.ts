@@ -180,6 +180,136 @@ export class ElasticsearchService {
   }
 
   /**
+   * Get the last logs with slow request times (json.request_time > threshold)
+   */
+  async getLastSlowRequestLogsForPod(podName: string, limit: number = 100, thresholdSeconds: number = 1): Promise<LogEntry[]> {
+    if (!this.enabled) {
+      return [];
+    }
+
+    try {
+      console.log(`🔍 Fetching last ${limit} slow request logs (>${thresholdSeconds}s) for pod: ${podName}`);
+
+      const searchQuery = {
+        query: {
+          bool: {
+            must: [
+              // Pod name filter (exact match)
+              {
+                bool: {
+                  should: [
+                    {
+                      term: {
+                        'json.hostname.keyword': podName
+                      }
+                    },
+                    {
+                      term: {
+                        'json.hostname': podName
+                      }
+                    }
+                  ],
+                  minimum_should_match: 1
+                }
+              },
+              // Request time filter (greater than threshold)
+              {
+                range: {
+                  'json.request_time': {
+                    gt: thresholdSeconds
+                  }
+                }
+              },
+              // Make sure json.request_time field exists
+              {
+                exists: {
+                  field: 'json.request_time'
+                }
+              }
+            ]
+          }
+        },
+        sort: [
+          {
+            '@timestamp': {
+              order: 'desc'
+            }
+          }
+        ],
+        size: limit,
+        _source: [
+          '@timestamp',
+          'json.levelname',
+          'json.message',
+          'json.hostname',
+          'json.service_name',
+          'json.module',
+          'json.environment',
+          'json.request_time',
+          'applicationName',
+          'ct_deployment',
+          'ct_feature',
+          'ct_kind'
+        ]
+      };
+
+      console.log('📡 Elasticsearch query:', JSON.stringify(searchQuery, null, 2));
+
+      const response = await fetch(`${this.config.url}/_search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}`
+        },
+        body: JSON.stringify({
+          index: this.config.indexPattern,
+          ...searchQuery
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const hits = data.hits?.hits || [];
+
+      const logs: LogEntry[] = hits.map((hit: any) => {
+        const source = hit._source;
+        return {
+          timestamp: source['@timestamp'] || new Date().toISOString(),
+          level: source.json?.levelname || 'info',
+          message: source.json?.message || 'No message',
+          pod: source.json?.hostname || podName,
+          container: source.ct_deployment,
+          namespace: source.ct_feature,
+          source: 'elasticsearch',
+          service: source.json?.service_name,
+          module: source.json?.module,
+          environment: source.json?.environment,
+          applicationName: source.applicationName,
+          requestTime: source.json?.request_time // Include request time for display
+        };
+      });
+
+      console.log(`✅ Found ${logs.length} slow request log entries for pod ${podName}`);
+      return logs;
+
+    } catch (error: any) {
+      console.error('❌ Elasticsearch slow request query failed:', error);
+      
+      // Check if this is a 404 which might mean no results found
+      if (error.meta?.statusCode === 404) {
+        console.log('ℹ️  404 response - this might indicate no matching documents were found');
+        return [];
+      }
+      
+      // Return empty array instead of throwing to allow graceful degradation
+      return [];
+    }
+  }
+
+  /**
    * Get logs around a specific time window (useful for alert correlation)
    */
   async getLogsAroundTime(podName: string, alertTime: Date, windowMinutes: number = 10): Promise<LogEntry[]> {

@@ -11,13 +11,24 @@ import { LogModal } from '../components/LogModal';
 
 type Health = {
   ok: boolean;
-  services?: { github: boolean; openai: boolean; elasticsearch: boolean };
+  services?: { github: boolean; openai: boolean; elasticsearch: boolean; grafana: boolean };
   error?: string;
 };
 
 type QuickForm = { alertname: string; pod: string };
 
-type TabKey = 'recent' | 'error' | 'time';
+type ElasticSettings = {
+  timeframeMinutes: number;
+  documentLimit: number;
+  slowRequestThreshold: number;
+};
+
+type AIPromptSettings = {
+  explanationPrompt: string;
+  analysisPrompt: string;
+};
+
+type TabKey = 'recent' | 'error' | 'time' | 'slow';
 
 export const App: React.FC = () => {
   const [health, setHealth] = useState<Health | null>(null);
@@ -29,8 +40,19 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('recent');
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [elasticSettings, setElasticSettings] = useState<ElasticSettings>({
+    timeframeMinutes: 60,
+    documentLimit: 100,
+    slowRequestThreshold: 1
+  });
+  const [showElasticSettings, setShowElasticSettings] = useState(false);
+  const [aiPromptSettings, setAIPromptSettings] = useState<AIPromptSettings>({
+    explanationPrompt: "You are a Prometheus expert explaining PromQL to experienced software engineers. Be concise and technical. Focus on: what metric is being measured, the threshold/condition that triggers the alert, and the immediate system impact. Assume familiarity with observability concepts.",
+    analysisPrompt: "You are an SRE analyzing production issues for experienced engineers. Be concise and technical. Correlate alert data with logs to identify root causes and provide actionable next steps. Use markdown formatting: ## headers, **bold** for key points, `code` for technical details. Skip basic explanations - focus on analysis and solutions."
+  });
+  const [showAIPromptSettings, setShowAIPromptSettings] = useState(false);
 
-  const canSubmit = useMemo(() => form.alertname.trim() && form.pod.trim(), [form]);
+  const canSubmit = useMemo(() => form.pod.trim(), [form]); // Only pod is required
 
   async function fetchHealth() {
     setError(null);
@@ -69,7 +91,10 @@ export const App: React.FC = () => {
 
 
 
-  const currentLogs = activeTab === 'recent' ? result?.lastLogs : activeTab === 'error' ? result?.lastErrorLogs : result?.lastSlowDebuggerLogs;
+  const currentLogs = activeTab === 'recent' ? result?.lastLogs : 
+                      activeTab === 'error' ? result?.lastErrorLogs : 
+                      activeTab === 'time' ? result?.lastTimeDebuggerLogs :
+                      result?.lastSlowRequestLogs;
 
   const handleLogClick = (log: any) => {
     setSelectedLog(log);
@@ -91,8 +116,8 @@ export const App: React.FC = () => {
       </header>
 
       <div className="container">
-                <div className="grid-2col">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+        <div className="grid-2col">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
             <SectionCard title="Quick Run" actions={
               <div className="row">
                 <button className="button" disabled={!canSubmit || loading} onClick={submitQuick}>
@@ -101,12 +126,181 @@ export const App: React.FC = () => {
               </div>
             }>
               <div className="row" style={{ gap: 12 }}>
-                <input className="input" placeholder="alertname (e.g. ContainerCPUThrotellingIsHigh)" value={form.alertname} onChange={(e) => setForm((f) => ({ ...f, alertname: e.target.value }))} aria-label="Alert name" />
-                <input className="input" placeholder="pod (e.g. my-pod-123)" value={form.pod} onChange={(e) => setForm((f) => ({ ...f, pod: e.target.value }))} aria-label="Pod name" />
+                <input className="input" placeholder="alertname (optional - e.g. ContainerCPUThrotellingIsHigh)" value={form.alertname} onChange={(e) => setForm((f) => ({ ...f, alertname: e.target.value }))} aria-label="Alert name (optional)" />
+                <input className="input" placeholder="pod (required - e.g. my-pod-123)" value={form.pod} onChange={(e) => setForm((f) => ({ ...f, pod: e.target.value }))} aria-label="Pod name (required)" />
               </div>
               {loading && <div className="skeleton" style={{ height: 40, marginTop: 12 }} />}
               {error && <div role="alert" className="muted" style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</div>}
             </SectionCard>
+
+            <div className="elastic-settings-card">
+              <button 
+                className="elastic-settings-header"
+                onClick={() => setShowElasticSettings(!showElasticSettings)}
+                aria-expanded={showElasticSettings}
+                aria-controls="elastic-settings-panel"
+              >
+                <div className="elastic-settings-title">
+                  <span className="elastic-settings-icon">
+                    ⚙️
+                  </span>
+                  <span>Elasticsearch Configuration</span>
+                  <span className="elastic-settings-badge">
+                    {elasticSettings.timeframeMinutes < 60 ? `${elasticSettings.timeframeMinutes}m` : `${Math.floor(elasticSettings.timeframeMinutes / 60)}h`}
+                    {' • '}
+                    {elasticSettings.documentLimit} docs
+                    {' • '}
+                    {elasticSettings.slowRequestThreshold}s
+                  </span>
+                </div>
+                <span className={`elastic-settings-chevron ${showElasticSettings ? 'expanded' : ''}`}>
+                  ⌄
+                </span>
+              </button>
+              
+              {showElasticSettings && (
+                <div className="elastic-settings-panel" id="elastic-settings-panel">
+                  <div className="elastic-settings-grid">
+                    <div className="elastic-setting-row">
+                      <label className="elastic-setting-label">
+                        🕐 Timeframe
+                      </label>
+                      <div className="elastic-setting-control">
+                        <select 
+                          value={elasticSettings.timeframeMinutes}
+                          onChange={(e) => setElasticSettings(prev => ({ ...prev, timeframeMinutes: parseInt(e.target.value) }))}
+                          className="elastic-select"
+                        >
+                          <option value={15}>Last 15 minutes</option>
+                          <option value={30}>Last 30 minutes</option>
+                          <option value={60}>Last 1 hour</option>
+                          <option value={120}>Last 2 hours</option>
+                          <option value={360}>Last 6 hours</option>
+                          <option value={720}>Last 12 hours</option>
+                          <option value={1440}>Last 24 hours</option>
+                        </select>
+                        <span className="elastic-setting-hint">How far back to search</span>
+                      </div>
+                    </div>
+                    
+                    <div className="elastic-setting-row">
+                      <label className="elastic-setting-label">
+                        📄 Document Limit
+                      </label>
+                      <div className="elastic-setting-control">
+                        <input 
+                          type="number"
+                          min="10"
+                          max="1000"
+                          value={elasticSettings.documentLimit}
+                          onChange={(e) => setElasticSettings(prev => ({ ...prev, documentLimit: parseInt(e.target.value) || 100 }))}
+                          className="elastic-input"
+                        />
+                        <span className="elastic-setting-hint">Documents per log type</span>
+                      </div>
+                    </div>
+                    
+                    <div className="elastic-setting-row">
+                      <label className="elastic-setting-label">
+                        🐌 Slow Threshold
+                      </label>
+                      <div className="elastic-setting-control">
+                        <input 
+                          type="number"
+                          min="0.1"
+                          max="30"
+                          step="0.1"
+                          value={elasticSettings.slowRequestThreshold}
+                          onChange={(e) => setElasticSettings(prev => ({ ...prev, slowRequestThreshold: parseFloat(e.target.value) || 1 }))}
+                          className="elastic-input"
+                        />
+                        <span className="elastic-setting-hint">Seconds for slow requests</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="ai-prompt-settings-card">
+              <button 
+                className="ai-prompt-settings-header"
+                onClick={() => setShowAIPromptSettings(!showAIPromptSettings)}
+                aria-expanded={showAIPromptSettings}
+                aria-controls="ai-prompt-settings-panel"
+              >
+                <div className="ai-prompt-settings-title">
+                  <span className="ai-prompt-settings-icon">
+                    🤖
+                  </span>
+                  <span>AI Prompt Configuration</span>
+                  <span className="ai-prompt-settings-badge">
+                    {aiPromptSettings.explanationPrompt.length + aiPromptSettings.analysisPrompt.length} chars
+                  </span>
+                </div>
+                <span className={`ai-prompt-settings-chevron ${showAIPromptSettings ? 'expanded' : ''}`}>
+                  ⌄
+                </span>
+              </button>
+              
+              {showAIPromptSettings && (
+                <div className="ai-prompt-settings-panel" id="ai-prompt-settings-panel">
+                  <div className="ai-prompt-settings-grid">
+                    <div className="ai-prompt-setting-row">
+                      <label className="ai-prompt-setting-label">
+                        💡 Explanation Prompt
+                      </label>
+                      <div className="ai-prompt-setting-control">
+                        <textarea 
+                          value={aiPromptSettings.explanationPrompt}
+                          onChange={(e) => setAIPromptSettings(prev => ({ ...prev, explanationPrompt: e.target.value }))}
+                          className="ai-prompt-textarea"
+                          rows={4}
+                          placeholder="Enter the system prompt for PromQL explanations..."
+                        />
+                        <span className="ai-prompt-setting-hint">
+                          Controls how AI explains Prometheus queries - used for alert expression explanations
+                        </span>
+              </div>
+              </div>
+                    
+                    <div className="ai-prompt-setting-row">
+                      <label className="ai-prompt-setting-label">
+                        🔍 Analysis Prompt
+                      </label>
+                      <div className="ai-prompt-setting-control">
+                        <textarea 
+                          value={aiPromptSettings.analysisPrompt}
+                          onChange={(e) => setAIPromptSettings(prev => ({ ...prev, analysisPrompt: e.target.value }))}
+                          className="ai-prompt-textarea"
+                          rows={4}
+                          placeholder="Enter the system prompt for alert analysis..."
+                        />
+                        <span className="ai-prompt-setting-hint">
+                          Controls how AI analyzes alerts with logs - used for comprehensive analysis and recommendations
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="ai-prompt-actions">
+                      <button 
+                        onClick={() => setAIPromptSettings({
+                          explanationPrompt: "You are a Prometheus expert explaining PromQL to experienced software engineers. Be concise and technical. Focus on: what metric is being measured, the threshold/condition that triggers the alert, and the immediate system impact. Assume familiarity with observability concepts.",
+                          analysisPrompt: "You are an SRE analyzing production issues for experienced engineers. Be concise and technical. Correlate alert data with logs to identify root causes and provide actionable next steps. Use markdown formatting: ## headers, **bold** for key points, `code` for technical details. Skip basic explanations - focus on analysis and solutions."
+                        })}
+                        className="ai-prompt-reset-btn"
+                      >
+                        🔄 Reset to Defaults
+                      </button>
+                      <div className="ai-prompt-info">
+                        <span>📊 Explanation: {aiPromptSettings.explanationPrompt.length} chars</span>
+                        <span>📈 Analysis: {aiPromptSettings.analysisPrompt.length} chars</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <SectionCard title="Result">
               {!result && !loading && <div className="muted">Run a query to see results.</div>}
@@ -117,7 +311,7 @@ export const App: React.FC = () => {
                 </>
               )}
               {result && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                   <div>
                     <div className="row" style={{ gap: 8, marginBottom: 8 }}>
                       <StatPill label="Status" value={result.status} tone={result.status === 'FIRING' ? 'danger' : 'success'} />
@@ -146,7 +340,7 @@ export const App: React.FC = () => {
               )}
             </SectionCard>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
             <SectionCard title="Service Health">
               {!health && <div className="muted">Click "Check Health" to fetch status.</div>}
               {health && (
@@ -154,6 +348,7 @@ export const App: React.FC = () => {
                   <StatPill label="GitHub" value={health.services?.github ? 'OK' : 'DOWN'} tone={health.services?.github ? 'success' : 'danger'} />
                   <StatPill label="OpenAI" value={health.services?.openai ? 'OK' : 'DOWN'} tone={health.services?.openai ? 'success' : 'danger'} />
                   <StatPill label="Elasticsearch" value={health.services?.elasticsearch ? 'OK' : 'DOWN'} tone={health.services?.elasticsearch ? 'success' : 'danger'} />
+                  <StatPill label="Grafana" value={health.services?.grafana ? 'OK' : 'DOWN'} tone={health.services?.grafana ? 'success' : 'danger'} />
                 </div>
               )}
             </SectionCard>
@@ -164,9 +359,10 @@ export const App: React.FC = () => {
               {result && (
                 <div>
                   <div className="tabs" role="tablist" aria-label="Log categories">
-                    <button className="tab" role="tab" aria-selected={activeTab === 'recent'} aria-controls="recent-panel" id="recent-tab" onClick={() => setActiveTab('recent')}>General</button>
-                    <button className="tab" role="tab" aria-selected={activeTab === 'error'} aria-controls="error-panel" id="error-tab" onClick={() => setActiveTab('error')}>Error</button>
-                    <button className="tab" role="tab" aria-selected={activeTab === 'time'} aria-controls="time-panel" id="time-tab" onClick={() => setActiveTab('time')}>Slow</button>
+                    <button className="tab" role="tab" aria-selected={activeTab === 'recent'} aria-controls="recent-panel" id="recent-tab" onClick={() => setActiveTab('recent')}>General ({result.lastLogs?.length || 0})</button>
+                    <button className="tab" role="tab" aria-selected={activeTab === 'error'} aria-controls="error-panel" id="error-tab" onClick={() => setActiveTab('error')}>Error ({result.lastErrorLogs?.length || 0})</button>
+                    <button className="tab" role="tab" aria-selected={activeTab === 'time'} aria-controls="time-panel" id="time-tab" onClick={() => setActiveTab('time')}>Time Debugger ({result.lastTimeDebuggerLogs?.length || 0})</button>
+                    <button className="tab" role="tab" aria-selected={activeTab === 'slow'} aria-controls="slow-panel" id="slow-tab" onClick={() => setActiveTab('slow')}>Slow ({result.lastSlowRequestLogs?.length || 0})</button>
                   </div>
                   <div role="tabpanel" id={`${activeTab}-panel`} aria-labelledby={`${activeTab}-tab`}>
                     <LogTable logs={currentLogs} emptyText="No logs" ariaLabel={`${activeTab} logs`} onLogClick={handleLogClick} />

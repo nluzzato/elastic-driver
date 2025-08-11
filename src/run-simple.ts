@@ -73,7 +73,22 @@ async function main() {
     const context = await alertService.processAlert(alert);
     
     // Use the formatted context which includes AI explanation
-    console.log('\n' + context.formattedContext);
+    // Display simplified context since formattedContext was removed
+    console.log('\n🚨 Alert Context Results:');
+    console.log('─'.repeat(50));
+    console.log(`📊 Alert: ${context.alertname}`);
+    console.log(`📊 Status: ${context.status}`);
+    console.log(`📊 Found: ${context.found ? 'Yes' : 'No'}`);
+    if (context.file) console.log(`📄 File: ${context.file}`);
+    if (context.url) console.log(`🔗 URL: ${context.url}`);
+    if (context.alertExpressionExplanation) {
+      console.log('\n🤖 AI Explanation:');
+      console.log(context.alertExpressionExplanation);
+    }
+    if (context.analysisText) {
+      console.log('\n🤖 AI Analysis:');
+      console.log(context.analysisText);
+    }
     
   } catch (error) {
     console.error('❌ Error:', error);
