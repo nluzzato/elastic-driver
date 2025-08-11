@@ -124,6 +124,20 @@ export class SimpleAlertService {
   }
 
   /**
+   * Get all logs for a specific request ID (public wrapper)
+   */
+  async getRequestTrace(requestId: string, maxDocs: number = 1000): Promise<any[]> {
+    return await this.elasticsearchService.getAllLogsByRequestId(requestId, maxDocs);
+  }
+
+  /**
+   * Generate contextual debugging prompt (public wrapper)
+   */
+  async generateDebugPrompt(requestId: string, documents: any[], customPrompt?: string): Promise<string> {
+    return await this.openaiService.generateContextualDebugPrompt(requestId, documents, customPrompt);
+  }
+
+  /**
    * Test all services (GitHub + OpenAI + Elasticsearch + Grafana)
    */
   async fullHealthCheck(): Promise<{ github: boolean; openai: boolean; elasticsearch: boolean; grafana: boolean }> {

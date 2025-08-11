@@ -90,7 +90,7 @@ app.post('/api/request-trace', async (req, res) => {
     const service = new SimpleAlertService(appConfig);
     
     // Get all documents for the request ID
-    const documents = await service.elasticsearchService.getAllLogsByRequestId(requestId);
+    const documents = await service.getRequestTrace(requestId);
     
     if (documents.length === 0) {
       return res.json({ 
@@ -126,11 +126,7 @@ app.post('/api/generate-debug-prompt', async (req, res) => {
     const service = new SimpleAlertService(appConfig);
     
     // Generate contextual debugging prompt using o3-mini
-    const debugPrompt = await service.openaiService.generateContextualDebugPrompt(
-      requestId,
-      documents,
-      customPrompt
-    );
+    const debugPrompt = await service.generateDebugPrompt(requestId, documents, customPrompt);
 
     res.json({
       requestId,
