@@ -1,6 +1,16 @@
 // Centralized Application Configuration
 // All configurable prompts, settings, and constants
 
+// Special behavior types for presets
+export enum PresetBehavior {
+  STANDARD = 'standard',
+  RESET_INVESTIGATION = 'reset-investigation',
+  PERFORMANCE_ANALYSIS = 'performance-analysis',
+  SECURITY_AUDIT = 'security-audit',
+  CAPACITY_PLANNING = 'capacity-planning',
+  ERROR_CORRELATION = 'error-correlation'
+}
+
 export const ApplicationConfiguration = {
   // ===== AI PROMPTS =====
   
@@ -176,16 +186,6 @@ export const {
 export type ElasticSettings = typeof defaultElasticSettings;
 export type AiSettings = typeof defaultAiSettings;
 export type RequestTracingConfig = typeof requestTracing;
-
-// Special behavior types for presets
-export enum PresetBehavior {
-  STANDARD = 'standard',
-  RESET_INVESTIGATION = 'reset-investigation',
-  PERFORMANCE_ANALYSIS = 'performance-analysis',
-  SECURITY_AUDIT = 'security-audit',
-  CAPACITY_PLANNING = 'capacity-planning',
-  ERROR_CORRELATION = 'error-correlation'
-}
 
 // Preset type definitions
 export interface Preset {
