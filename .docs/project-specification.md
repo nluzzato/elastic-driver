@@ -26,12 +26,12 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 ```
 
 ### Data Flow
-1. **Input**: Prometheus alert JSON (alertname, pod, status, details)
-2. **GitHub Enrichment**: Search for alert rule definition in `Connecteam/alerts` repository
-3. **OpenAI Explanation**: Generate human-readable explanation of PromQL query
-4. **Log Fetching**: Parallel retrieval of 3 log types from Elasticsearch
+1. **Input**: Prometheus alert JSON (alertname, pod, status, details) OR minimal input (pod name only)
+2. **GitHub Enrichment**: Search for alert rule definition in `Connecteam/alerts` repository (optional if no alertname)
+3. **OpenAI Explanation**: Generate human-readable explanation of PromQL query (optional if no alert found)
+4. **Log Fetching**: Parallel retrieval of 4 log types from Elasticsearch
 5. **Metrics Fetching**: Query Grafana/Prometheus for current values and trends
-6. **AI Analysis**: Comprehensive analysis using o3-mini model with metrics + logs
+6. **AI Analysis**: Comprehensive analysis using o3-mini model with logs (works with or without alert context)
 7. **Output**: Formatted context and structured fields (logs, explanations, analysis) returned via REST and rendered in GUI
 
 ## Core Services Architecture
@@ -64,7 +64,8 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
   - `o3-mini`: Alert correlation and analysis (reasoning-optimized)
 - **Key Methods**:
   - `explainPrometheusQuery()`: Converts technical PromQL to plain language
-  - `analyzeAlertWithLogs()`: Correlates alert with logs for root cause analysis
+  - `analyzeAlertWithLogs()`: Correlates alert with logs for root cause analysis (works with or without alert context)
+- **Flexible Analysis**: Can perform general log analysis when no specific alert is provided
 
 ### 4. ElasticsearchService (Operational Logs)
 - **File**: `src/services/ElasticsearchService.ts`
@@ -73,8 +74,9 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 - **Log Types Retrieved**:
   - **General Logs**: Last 100 general application logs
   - **Error Logs**: Last 100 ERROR-level logs (`json.levelname = "ERROR"`)
-  - **Performance Logs**: Last 100 TIME_DEBUGGER [SLOW] logs (`[TIME_DEBUGGER] [SLOW]` in message)
-- **Search Field**: `json.hostname` (exact match on pod name)
+  - **Time Debugger Logs**: Last 100 TIME_DEBUGGER [SLOW] logs (`[TIME_DEBUGGER] [SLOW]` in message)
+  - **Slow Request Logs**: Last 100 logs where `json.request_time > threshold` (configurable, default 1s)
+- **Search Field**: `json.hostname` (exact match on pod name using term queries)
 
 ### 5. GrafanaService (Metrics & Dashboards)
 - **File**: `src/services/GrafanaService.ts`
@@ -190,7 +192,8 @@ interface ContextOutput {
   // Structured fields for GUI consumption
   lastLogs?: ElasticLogEntry[];
   lastErrorLogs?: ElasticLogEntry[];
-  lastSlowDebuggerLogs?: ElasticLogEntry[];
+  lastTimeDebuggerLogs?: ElasticLogEntry[];
+  lastSlowRequestLogs?: ElasticLogEntry[];
   alertExpressionExplanation?: string;
   analysisText?: string;
 }
@@ -206,6 +209,7 @@ interface ElasticLogEntry {
   module?: string;
   environment?: string;
   applicationName?: string;
+  requestTime?: number; // For slow request logs
 }
 ```
 
@@ -216,6 +220,11 @@ interface ElasticLogEntry {
 npm run quick <alertname> <podname>
 ```
 **Example**: `npm run quick ContainerCPUThrotellingIsHigh pymobiengine-user-status-656f8b67bc-cf6pm`
+
+**Note**: Alert name is now optional - you can analyze logs for any pod even without a specific alert:
+```bash
+npm run quick "" <podname>  # General log analysis without alert context
+```
 
 ### Additional Tools
 - `npm run alert`: Process full JSON alert
@@ -366,8 +375,8 @@ examples/              # Example alert data
 - API: Express server (`src/server.ts`) exposing REST endpoints consumed by the GUI.
 
 ### Endpoints
-- `GET /api/health`: returns `{ github, openai, elasticsearch }` connectivity.
-- `POST /api/quick`: `{ alertname, pod }` → `ContextOutput` (with structured fields).
+- `GET /api/health`: returns `{ github, openai, elasticsearch, grafana }` connectivity.
+- `POST /api/quick`: `{ alertname, pod }` → `ContextOutput` (with structured fields). Alert name is optional.
 - `POST /api/alert`: `Alert` JSON → `ContextOutput`.
 
 ### NPM Scripts

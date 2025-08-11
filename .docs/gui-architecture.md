@@ -27,7 +27,9 @@ The server uses the existing configuration loader `src/config/index.ts` and does
 
 The `App` screen provides:
 - Service Health panel: Calls `/api/health` and displays connectivity status for GitHub, OpenAI, Elasticsearch, Grafana.
-- Quick Run form: `alertname` + `pod` to invoke `/api/quick`. The response renders both structured fields and the `formattedContext` string from the orchestrator.
+- Quick Run form: `alertname` (optional) + `pod` (required) to invoke `/api/quick`. The response renders structured fields with rich UI components.
+- Collapsible Settings Panels: Elasticsearch configuration (timeframe, document limits, slow request threshold) and AI prompt configuration.
+- Enhanced Log Display: Four log categories (General, Error, Time Debugger, Slow Requests) with clear visual selection indicators and clickable entries.
 
 ### API Response Shape for GUI
 
@@ -36,12 +38,12 @@ The server enriches the classic `ContextOutput` with structured fields for the G
 ```
 interface ContextOutput {
   // existing fields...
-  formattedContext: string;
-
+  
   // structured fields for GUI
   lastLogs?: ElasticLogEntry[];
   lastErrorLogs?: ElasticLogEntry[];
-  lastSlowDebuggerLogs?: ElasticLogEntry[];
+  lastTimeDebuggerLogs?: ElasticLogEntry[];
+  lastSlowRequestLogs?: ElasticLogEntry[];
   alertExpressionExplanation?: string;
   analysisText?: string;
 }
@@ -57,10 +59,11 @@ interface ElasticLogEntry {
   module?: string;
   environment?: string;
   applicationName?: string;
+  requestTime?: number; // For slow request logs
 }
 ```
 
-These are populated directly from `ElasticsearchService` results and `OpenAIQueryService` outputs to enable rich rendering without parsing the `formattedContext`.
+These are populated directly from `ElasticsearchService` results and `OpenAIQueryService` outputs to enable rich rendering with tabbed log views, markdown formatting, and interactive elements.
 
 ## Build Tooling
 
@@ -88,12 +91,22 @@ Alternatively, run only the API with `npm run server` and open the Vite dev serv
 - The resulting `ContextOutput` is returned as JSON to the UI.
 - No changes were made to `GitHubService`, `OpenAIQueryService`, or `ElasticsearchService` logic; the GUI simply orchestrates calls via the new REST endpoints.
 
+## Recent Enhancements (Completed)
+
+- ✅ Collapsible settings panels for Elasticsearch and AI prompt configuration
+- ✅ Enhanced log categorization with four types: General, Error, Time Debugger, Slow Requests
+- ✅ Clickable log entries with detailed modal view
+- ✅ Markdown rendering for AI explanations and analysis
+- ✅ Visual tab selection indicators
+- ✅ Consistent spacing and responsive design
+- ✅ Optional alert name - supports general log analysis without specific alerts
+
 ## Future Enhancements
 
-- Add a rich viewer for logs and error breakdowns.
 - Persist recent alert runs in local storage.
 - Add a form to POST full JSON alerts to `/api/alert`.
 - Slack webhook integration for sending formatted context.
+- Dashboard links and Grafana integration UI.
 
 ---
 
@@ -163,17 +176,20 @@ Acceptance criteria:
 - All components export a skeleton variant for loading.
 
 ### Layout and Screens
-- Replace `src/ui/screens/App.tsx` with a layout that includes:
+- `src/ui/screens/App.tsx` includes:
   - Header bar with alertname, pod, status `StatPill`, and primary actions.
   - Two-column responsive grid (min 320px columns). Stack on small screens.
-  - Cards: Expression Details, AI Explanation, AI Analysis, Service Health, Logs (three tabs), Instance Details.
+  - Cards: Quick Run, Elasticsearch Settings (collapsible), AI Prompt Configuration (collapsible), Results with Expression Details, AI Explanation, AI Analysis, Service Health, Logs (four tabs: General, Error, Time Debugger, Slow), Instance Details.
+  - Consistent spacing using CSS variables and flex layouts.
 
 ### Data Binding
 - Bind to existing endpoints:
   - `GET /api/health` → Service Health card.
-  - `POST /api/quick` → All main sections; stream or show skeletons while loading.
-- Render `formattedContext` inside `CodeBlock` with copy.
-- Render structured fields: `lastLogs`, `lastErrorLogs`, `lastSlowDebuggerLogs`, `alertExpressionExplanation`, `analysisText`.
+  - `POST /api/quick` → All main sections; show skeletons while loading.
+- Render structured fields with rich components:
+  - `lastLogs`, `lastErrorLogs`, `lastTimeDebuggerLogs`, `lastSlowRequestLogs` in tabbed `LogTable` with virtualization.
+  - `alertExpressionExplanation`, `analysisText` rendered as markdown.
+- Interactive features: clickable log entries open detailed modal, copy-to-clipboard functionality.
 
 ### Accessibility & Quality
 - Keyboard support and focus order checked manually.
