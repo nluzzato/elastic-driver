@@ -320,16 +320,17 @@ export class GitHubService {
    * Get commit details by commit hash
    * Used for reset investigation to get commit info from logs
    */
-  async getCommitDetails(commitHash: string): Promise<{ title: string; message: string; author: string; date: string } | null> {
+  async getCommitDetails(commitHash: string, customRepo?: string): Promise<{ title: string; message: string; author: string; date: string } | null> {
     if (!this.isEnabled()) {
       console.warn('⚠️  GitHub service not enabled - cannot fetch commit details');
       return null;
     }
 
     try {
-      console.log(`🔍 Fetching commit details for: ${commitHash}`);
+      const targetRepo = customRepo || this.repo;
+      console.log(`🔍 Fetching commit details for: ${commitHash} from ${this.owner}/${targetRepo}`);
       
-      const endpoint = `/repos/${this.owner}/${this.repo}/commits/${commitHash}`;
+      const endpoint = `/repos/${this.owner}/${targetRepo}/commits/${commitHash}`;
       const data = await this.makeRequest(endpoint);
       
       const commitInfo = {
@@ -339,10 +340,77 @@ export class GitHubService {
         date: data.commit?.author?.date || data.commit?.committer?.date || 'Unknown'
       };
       
-      console.log(`✅ Found commit: "${commitInfo.title}" by ${commitInfo.author}`);
+      console.log(`✅ Found commit: "${commitInfo.title}" by ${commitInfo.author} in ${this.owner}/${targetRepo}`);
       return commitInfo;
     } catch (error) {
-      console.error(`❌ Error fetching commit ${commitHash}:`, error);
+      console.error(`❌ Error fetching commit ${commitHash} from ${this.owner}/${customRepo || this.repo}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get pull request details and diff for a commit hash
+   * Used for reset investigation to provide PR context
+   */
+  async getPullRequestForCommit(commitHash: string, customRepo?: string): Promise<{ prNumber: number; title: string; diff: string; url: string } | null> {
+    if (!this.isEnabled()) {
+      console.warn('⚠️  GitHub service not enabled - cannot fetch PR details');
+      return null;
+    }
+
+    try {
+      const targetRepo = customRepo || this.repo;
+      console.log(`🔍 Searching for pull request containing commit: ${commitHash} in ${this.owner}/${targetRepo}`);
+      
+      // Search for PRs that contain this commit
+      const searchEndpoint = `/repos/${this.owner}/${targetRepo}/commits/${commitHash}/pulls`;
+      const pullRequests = await this.makeRequest(searchEndpoint);
+      
+      if (!pullRequests || pullRequests.length === 0) {
+        console.log(`ℹ️  No pull request found for commit ${commitHash}`);
+        return null;
+      }
+
+      // Get the first (most relevant) PR
+      const pr = pullRequests[0];
+      console.log(`🔍 Found PR #${pr.number}: "${pr.title}" for commit ${commitHash}`);
+
+      // Get the PR diff using a separate request
+      const diffEndpoint = `/repos/${this.owner}/${targetRepo}/pulls/${pr.number}`;
+      let prDiff = '';
+      
+      try {
+        // First try to get the diff
+        const diffResponse = await fetch(`${this.baseUrl}${diffEndpoint}`, {
+          headers: {
+            'Accept': 'application/vnd.github.v3.diff',
+            'Authorization': `token ${this.token}`,
+            'User-Agent': 'observability-agent'
+          }
+        });
+        
+        if (diffResponse.ok) {
+          prDiff = await diffResponse.text();
+        } else {
+          console.warn(`⚠️  Could not fetch diff for PR #${pr.number}: ${diffResponse.status}`);
+          prDiff = 'Diff not available';
+        }
+      } catch (diffError) {
+        console.warn(`⚠️  Error fetching diff for PR #${pr.number}:`, diffError);
+        prDiff = 'Diff not available';
+      }
+
+      const prInfo = {
+        prNumber: pr.number,
+        title: pr.title,
+        diff: prDiff,
+        url: pr.html_url
+      };
+
+      console.log(`✅ Retrieved PR #${pr.number} diff (${prInfo.diff.length} characters)`);
+      return prInfo;
+    } catch (error) {
+      console.error(`❌ Error fetching PR for commit ${commitHash}:`, error);
       return null;
     }
   }

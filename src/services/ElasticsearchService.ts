@@ -92,7 +92,7 @@ export class ElasticsearchService {
       // Add message filter if specified
       if (messageFilter) {
         mustFilters.push({
-          match_phrase: {
+          match: {
             'json.message': messageFilter
           }
         });
@@ -360,12 +360,24 @@ export class ElasticsearchService {
           bool: {
             must: [
               {
-                match: {
-                  'json.hostname': podName
+                bool: {
+                  should: [
+                    {
+                      term: {
+                        'json.hostname.keyword': podName
+                      }
+                    },
+                    {
+                      term: {
+                        'json.hostname': podName
+                      }
+                    }
+                  ],
+                  minimum_should_match: 1
                 }
               },
               {
-                match_phrase: {
+                match: {
                   'json.message': 'Git info: commit'
                 }
               },
@@ -390,11 +402,14 @@ export class ElasticsearchService {
         _source: ['@timestamp', 'json.message', 'json.hostname']
       };
 
-      const response = await fetch(`${this.config.url}/logs-*/_search`, {
+      const response = await fetch(`${this.config.url}/_search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(this.config.auth && { 'Authorization': this.config.auth })
+          ...(this.config.apiKey && { 'Authorization': `ApiKey ${this.config.apiKey}` }),
+          ...(this.config.username && this.config.password && { 
+            'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}` 
+          })
         },
         body: JSON.stringify(searchQuery)
       });
@@ -411,6 +426,9 @@ export class ElasticsearchService {
       const commitLogs = hits.map((hit: any) => {
         const source = hit._source;
         const message = source.json?.message || '';
+        const hostname = source.json?.hostname || 'unknown';
+        
+
         
         // Extract commit hash from message like "Git info: commit a1b2c3d4"
         const commitHashMatch = message.match(/Git info: commit ([a-f0-9]{8})/);
@@ -421,7 +439,7 @@ export class ElasticsearchService {
           commitHash,
           fullMessage: message
         };
-      }).filter(log => log.commitHash); // Only return logs with valid commit hashes
+      }).filter((log: { timestamp: string; commitHash: string; fullMessage: string }) => log.commitHash); // Only return logs with valid commit hashes
 
       console.log(`✅ Found ${commitLogs.length} valid Git commit entries`);
       return commitLogs;
@@ -449,7 +467,7 @@ export class ElasticsearchService {
           bool: {
             must: [
               {
-                match: {
+                term: {
                   'json.hostname': podName
                 }
               },
@@ -474,11 +492,14 @@ export class ElasticsearchService {
         _source: ['@timestamp', 'json.levelname', 'json.message', 'json.hostname', 'json.service_name', 'json.module', 'json.request_id']
       };
 
-      const response = await fetch(`${this.config.url}/logs-*/_search`, {
+      const response = await fetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(this.config.auth && { 'Authorization': this.config.auth })
+          ...(this.config.apiKey && { 'Authorization': `ApiKey ${this.config.apiKey}` }),
+          ...(this.config.username && this.config.password && { 
+            'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}` 
+          })
         },
         body: JSON.stringify(searchQuery)
       });

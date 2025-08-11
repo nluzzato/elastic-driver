@@ -14,8 +14,10 @@ This document describes the GUI architecture, how it interacts with the existing
 - Stack: Express with CORS + JSON middleware.
 - Endpoints:
   - `GET /api/health`: Calls `SimpleAlertService.fullHealthCheck()` and returns `{ github, openai, elasticsearch, grafana }` service connectivity.
-  - `POST /api/quick`: Accepts `{ alertname, pod, elasticSettings? }` and constructs a minimal `Alert`, then calls `SimpleAlertService.processAlert()` with the elastic settings and returns the resulting `ContextOutput`.
+  - `POST /api/quick`: Accepts `{ alertname, pod, elasticSettings?, logTypes?, preset?, specialBehavior? }` and constructs a minimal `Alert`, then calls `SimpleAlertService.processAlert()` with the elastic settings and returns the resulting `ContextOutput`.
   - `POST /api/alert`: Accepts a full `Alert` JSON payload and returns the resulting `ContextOutput`.
+  - `POST /api/request-trace`: Accepts `{ requestId }` for request flow analysis and debugging.
+  - `POST /api/generate-debug-prompt`: Accepts `{ requestId, documents, customPrompt? }` for contextual debugging prompt generation.
 
 The server uses the existing configuration loader `src/config/index.ts` and does not duplicate business logic.
 
@@ -27,9 +29,11 @@ The server uses the existing configuration loader `src/config/index.ts` and does
 
 The `App` screen provides:
 - Service Health panel: Calls `/api/health` and displays connectivity status for GitHub, OpenAI, Elasticsearch, Grafana.
-- Quick Run form: `alertname` (optional) + `pod` (required) to invoke `/api/quick`. The response renders structured fields with rich UI components.
+- Quick Run form: `alertname` (optional) + `pod` (required) + preset selection to invoke `/api/quick`. The response renders structured fields with rich UI components.
+- Preset System: Investigation presets including General Investigation, Reset Investigation, Performance Analysis, Security Audit, Capacity Planning, and Error Correlation.
 - Collapsible Settings Panels: Elasticsearch configuration (timeframe, document limits, slow request threshold) that dynamically controls log fetching behavior, and AI prompt configuration.
 - Enhanced Log Display: Four log categories (General, Error, Time Debugger, Slow Requests) with clear visual selection indicators and clickable entries.
+- Request Tracing: Optional request ID input for detailed request flow analysis and debugging.
 
 ### API Response Shape for GUI
 
@@ -63,9 +67,20 @@ interface ElasticLogEntry {
 }
 
 interface ElasticSettings {
-  timeframeMinutes: number;    // Search timeframe (not yet implemented) 
+  timeframeMinutes: number;    // Search timeframe for log filtering
   documentLimit: number;       // Number of documents to fetch per log type
   slowRequestThreshold: number; // Threshold in seconds for slow requests
+}
+
+interface LogTypes {
+  general: boolean;     // Include general application logs
+  error: boolean;       // Include ERROR-level logs
+  slow: boolean;        // Include slow request logs
+  timeDebugger: boolean; // Include TIME_DEBUGGER logs
+}
+
+interface PresetConfig {
+  gitHubRepo?: string;  // Override GitHub repository for specific presets
 }
 ```
 
@@ -106,6 +121,10 @@ Alternatively, run only the API with `npm run server` and open the Vite dev serv
 - ✅ Visual tab selection indicators
 - ✅ Consistent spacing and responsive design
 - ✅ Optional alert name - supports general log analysis without specific alerts
+- ✅ Investigation preset system with specialized behaviors (Reset Investigation, Performance Analysis, etc.)
+- ✅ Request tracing and contextual debugging capabilities
+- ✅ Fixed hostname filtering issues in Elasticsearch queries for precise pod log isolation
+- ✅ Improved Git commit log detection for reset investigation scenarios
 
 ## Future Enhancements
 
@@ -113,6 +132,10 @@ Alternatively, run only the API with `npm run server` and open the Vite dev serv
 - Add a form to POST full JSON alerts to `/api/alert`.
 - Slack webhook integration for sending formatted context.
 - Dashboard links and Grafana integration UI.
+- Real-time log streaming for active investigations.
+- Advanced preset customization and sharing.
+- Performance metrics dashboard for the agent itself.
+- Enhanced authentication header caching and connection pooling optimization.
 
 ---
 
@@ -183,9 +206,10 @@ Acceptance criteria:
 
 ### Layout and Screens
 - `src/ui/screens/App.tsx` includes:
-  - Header bar with alertname, pod, status `StatPill`, and primary actions.
+  - Header bar with alertname, pod, status `StatPill`, preset selection, and primary actions.
   - Two-column responsive grid (min 320px columns). Stack on small screens.
-  - Cards: Quick Run, Elasticsearch Settings (collapsible), AI Prompt Configuration (collapsible), Results with Expression Details, AI Explanation, AI Analysis, Service Health, Logs (four tabs: General, Error, Time Debugger, Slow), Instance Details.
+  - Cards: Quick Run with preset selection, Elasticsearch Settings (collapsible), AI Prompt Configuration (collapsible), Request Tracing (optional), Results with Expression Details, AI Explanation, AI Analysis, Service Health, Logs (four tabs: General, Error, Time Debugger, Slow), Instance Details.
+  - Preset-specific behaviors and special investigation modes (Reset Investigation, Performance Analysis, etc.).
   - Consistent spacing using CSS variables and flex layouts.
 
 ### Data Binding

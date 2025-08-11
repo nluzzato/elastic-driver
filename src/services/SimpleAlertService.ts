@@ -29,7 +29,8 @@ export class SimpleAlertService {
     alert: Alert, 
     elasticSettings?: { timeframeMinutes: number; documentLimit: number; slowRequestThreshold: number },
     logTypes?: { general: boolean; error: boolean; slow: boolean; timeDebugger: boolean },
-    specialBehavior?: PresetBehavior
+    specialBehavior?: PresetBehavior,
+    presetConfig?: { gitHubRepo?: string }
   ): Promise<ContextOutput> {
     const alertname = alert.details?.alertname || 'Unknown';
     
@@ -63,7 +64,20 @@ export class SimpleAlertService {
     const podName = alert.details?.pod;
     
     if (specialBehavior === PresetBehavior.RESET_INVESTIGATION && podName) {
-      resetInvestigationData = await this.performResetInvestigation(podName, elasticSettings);
+      console.log(`🔄 Triggering reset investigation for pod: ${podName} with behavior: ${specialBehavior}`);
+      console.log(`🔄 Using GitHub repo: ${presetConfig?.gitHubRepo || 'default'}`);
+      resetInvestigationData = await this.performResetInvestigation(podName, elasticSettings, presetConfig);
+      console.log(`🔄 Reset investigation result:`, resetInvestigationData?.found ? 'SUCCESS' : 'FAILED');
+      if (!resetInvestigationData?.found) {
+        console.log(`🔄 Reset investigation details:`, {
+          found: resetInvestigationData?.found,
+          message: resetInvestigationData?.message,
+          error: resetInvestigationData?.error,
+          logCount: resetInvestigationData?.logs?.length || 0
+        });
+      }
+    } else {
+      console.log(`ℹ️  Standard processing - behavior: ${specialBehavior}, pod: ${podName}`);
     }
     
     // Get logs from Elasticsearch if enabled and we have a pod name
@@ -74,19 +88,30 @@ export class SimpleAlertService {
     
     if (podName && this.elasticsearchService.isEnabled()) {
       try {
-        const limit = elasticSettings?.documentLimit || 100;
-        const slowThreshold = elasticSettings?.slowRequestThreshold || 1;
-        const timeframeMinutes = elasticSettings?.timeframeMinutes;
-        
-        console.log(`📊 Using Elasticsearch settings: ${limit} docs, ${slowThreshold}s slow threshold, ${timeframeMinutes || 'no'} timeframe`);
-        
-        // Fetch general logs, error logs, TIME_DEBUGGER logs, and slow request logs in parallel
-        [logs, errorLogs, timeDebuggerLogs, slowRequestLogs] = await Promise.all([
-          this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, undefined, timeframeMinutes),
-          this.elasticsearchService.getLastLogsForPod(podName, limit, 'ERROR', undefined, timeframeMinutes),
-          this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, '[TIME_DEBUGGER] [SLOW]', timeframeMinutes),
-          this.elasticsearchService.getLastSlowRequestLogsForPod(podName, limit, slowThreshold, timeframeMinutes)
-        ]);
+        // For reset investigation, use the logs from the reset investigation
+        if (specialBehavior === PresetBehavior.RESET_INVESTIGATION && resetInvestigationData?.found) {
+          console.log(`🔄 Using reset investigation logs: ${resetInvestigationData.logs.length} logs since commit ${resetInvestigationData.commitHash}`);
+          logs = resetInvestigationData.logs;
+          // For reset investigation, we focus on general and error logs from the reset data
+          errorLogs = resetInvestigationData.logs.filter((log: LogEntry) => log.level === 'ERROR');
+          timeDebuggerLogs = []; // Not needed for reset investigation
+          slowRequestLogs = []; // Not needed for reset investigation
+        } else {
+          // Standard log fetching for other presets
+          const limit = elasticSettings?.documentLimit || 100;
+          const slowThreshold = elasticSettings?.slowRequestThreshold || 1;
+          const timeframeMinutes = elasticSettings?.timeframeMinutes;
+          
+          console.log(`📊 Using Elasticsearch settings: ${limit} docs, ${slowThreshold}s slow threshold, ${timeframeMinutes || 'no'} timeframe`);
+          
+          // Fetch general logs, error logs, TIME_DEBUGGER logs, and slow request logs in parallel
+          [logs, errorLogs, timeDebuggerLogs, slowRequestLogs] = await Promise.all([
+            this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, undefined, timeframeMinutes),
+            this.elasticsearchService.getLastLogsForPod(podName, limit, 'ERROR', undefined, timeframeMinutes),
+            this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, '[TIME_DEBUGGER] [SLOW]', timeframeMinutes),
+            this.elasticsearchService.getLastSlowRequestLogsForPod(podName, limit, slowThreshold, timeframeMinutes)
+          ]);
+        }
       } catch (error) {
         console.warn('⚠️  Failed to fetch logs from Elasticsearch:', error);
       }
@@ -96,14 +121,44 @@ export class SimpleAlertService {
     let aiAnalysis: string | undefined;
     if (this.openaiService.isEnabled() && (logs.length > 0 || errorLogs.length > 0 || timeDebuggerLogs.length > 0 || slowRequestLogs.length > 0)) {
       try {
-        aiAnalysis = await this.openaiService.analyzeAlertWithLogs(
-          alertname,
-          aiExplanation, // Can be undefined if no alert found
-          logs,
-          errorLogs,
-          timeDebuggerLogs,
-          slowRequestLogs
-        );
+        // For reset investigation, include commit and PR information in the analysis
+        if (specialBehavior === PresetBehavior.RESET_INVESTIGATION && resetInvestigationData?.found) {
+          let commitContext = `Reset Investigation Context:\n- Pod restarted after commit: ${resetInvestigationData.commitHash}`;
+          
+          if (resetInvestigationData.commitInfo) {
+            commitContext += `\n- Commit: "${resetInvestigationData.commitInfo.title}" by ${resetInvestigationData.commitInfo.author}`;
+          }
+          
+          if (resetInvestigationData.prInfo) {
+            commitContext += `\n- Pull Request: #${resetInvestigationData.prInfo.prNumber} - "${resetInvestigationData.prInfo.title}"`;
+            commitContext += `\n- PR URL: ${resetInvestigationData.prInfo.url}`;
+            commitContext += `\n\nCode Changes (PR Diff):\n\`\`\`diff\n${resetInvestigationData.prInfo.diff.substring(0, 8000)}\n\`\`\``;
+            if (resetInvestigationData.prInfo.diff.length > 8000) {
+              commitContext += `\n\n(Diff truncated - showing first 8000 characters)`;
+            }
+          }
+          
+          commitContext += `\n- Analyzing ${resetInvestigationData.logCount} logs since ${resetInvestigationData.startTimestamp}`;
+          
+          aiAnalysis = await this.openaiService.analyzeAlertWithLogs(
+            'Pod Reset Investigation',
+            commitContext, // Use enhanced commit context with PR diff
+            logs,
+            errorLogs,
+            timeDebuggerLogs,
+            slowRequestLogs
+          );
+        } else {
+          // Standard analysis for other presets
+          aiAnalysis = await this.openaiService.analyzeAlertWithLogs(
+            alertname,
+            aiExplanation, // Can be undefined if no alert found
+            logs,
+            errorLogs,
+            timeDebuggerLogs,
+            slowRequestLogs
+          );
+        }
       } catch (error) {
         console.warn('⚠️  Failed to get OpenAI analysis:', error);
       }
@@ -172,38 +227,63 @@ export class SimpleAlertService {
   /**
    * Perform reset investigation: find Git commit logs and get logs since pod initialization
    */
-  private async performResetInvestigation(podName: string, elasticSettings?: { timeframeMinutes: number; documentLimit: number; slowRequestThreshold: number }) {
+  private async performResetInvestigation(
+    podName: string, 
+    elasticSettings?: { timeframeMinutes: number; documentLimit: number; slowRequestThreshold: number },
+    presetConfig?: { gitHubRepo?: string }
+  ) {
     console.log(`🔄 Starting reset investigation for pod: ${podName}`);
+    console.log(`🔄 Elasticsearch enabled:`, this.elasticsearchService.isEnabled());
     
     try {
       // Step 1: Search for Git commit logs
       const timeframeMinutes = elasticSettings?.timeframeMinutes || 240;
+      console.log(`🔄 Searching for Git commit logs in last ${timeframeMinutes} minutes`);
       const commitLogs = await this.elasticsearchService.findGitCommitLogs(podName, timeframeMinutes);
+      console.log(`🔄 Found ${commitLogs.length} Git commit log entries`);
       
       if (commitLogs.length === 0) {
         console.warn(`⚠️  No Git commit logs found for pod ${podName} in last ${timeframeMinutes} minutes`);
-        return {
+        
+                  return {
           found: false,
-          message: `No Git commit logs found for pod ${podName} in the specified timeframe`,
+          message: `No Git commit logs found for pod ${podName} in the specified timeframe of ${timeframeMinutes} minutes. Check if your application logs contain "Git info: commit" messages.`,
           logs: [],
-          commitInfo: null
+          commitInfo: null,
+          prInfo: null
         };
       }
       
       // Step 2: Use the first (most recent) or second commit timestamp as start time
       const targetCommit = commitLogs[0]; // Use most recent commit
-      const startTimestamp = targetCommit.timestamp;
+      const commitTimestamp = targetCommit.timestamp;
       const commitHash = targetCommit.commitHash;
       
-      console.log(`📍 Using commit ${commitHash} at ${startTimestamp} as reset investigation start point`);
+      // Start fetching logs from 1 second before the commit to include the commit log in results
+      const commitDate = new Date(commitTimestamp);
+      const startDate = new Date(commitDate.getTime() - 1000); // 1 second before
+      const startTimestamp = startDate.toISOString();
       
-      // Step 3: Get GitHub commit details
+      console.log(`📍 Using commit ${commitHash} at ${commitTimestamp} as reset investigation reference point`);
+      console.log(`📍 Fetching logs starting from ${startTimestamp} (1 second before commit) to include commit log`);
+      
+      // Step 3: Get GitHub commit details and PR information (use preset-specific repo if configured)
       let commitInfo = null;
+      let prInfo = null;
       if (this.githubService.isEnabled() && commitHash) {
-        commitInfo = await this.githubService.getCommitDetails(commitHash);
+        const repoToUse = presetConfig?.gitHubRepo;
+        if (repoToUse) {
+          console.log(`🔍 Fetching commit and PR details from repository: ${repoToUse}`);
+        }
+        
+        // Get commit details and PR information in parallel
+        [commitInfo, prInfo] = await Promise.all([
+          this.githubService.getCommitDetails(commitHash, repoToUse),
+          this.githubService.getPullRequestForCommit(commitHash, repoToUse)
+        ]);
       }
       
-      // Step 4: Get all logs since that timestamp
+      // Step 4: Get all logs since that timestamp (1 second before commit)
       const limit = elasticSettings?.documentLimit || 500;
       const logsSinceReset = await this.elasticsearchService.getLogsSinceTimestamp(podName, startTimestamp, limit);
       
@@ -214,6 +294,7 @@ export class SimpleAlertService {
         startTimestamp,
         commitHash,
         commitInfo,
+        prInfo,
         logs: logsSinceReset,
         logCount: logsSinceReset.length,
         message: `Found ${logsSinceReset.length} logs since pod initialization (commit ${commitHash})`
@@ -221,12 +302,13 @@ export class SimpleAlertService {
       
     } catch (error) {
       console.error('❌ Error during reset investigation:', error);
-      return {
-        found: false,
-        error: error instanceof Error ? error.message : 'Unknown error during reset investigation',
-        logs: [],
-        commitInfo: null
-      };
+              return {
+          found: false,
+          error: error instanceof Error ? error.message : 'Unknown error during reset investigation',
+          logs: [],
+          commitInfo: null,
+          prInfo: null
+        };
     }
   }
 }

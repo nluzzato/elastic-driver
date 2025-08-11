@@ -33,14 +33,23 @@ Expression to explain:`,
 Your task:
 1. Analyze the provided logs for patterns, anomalies, and potential root causes
 2. Correlate findings with any alert information provided  
-3. Provide actionable recommendations for investigation and resolution
-4. Focus on practical next steps for the engineering team
+3. If code changes (PR diff) are provided, analyze how they might relate to observed issues
+4. Provide actionable recommendations for investigation and resolution
+5. Focus on practical next steps for the engineering team
 
 Provide your analysis in markdown format with clear sections:
 - **Key Findings**: Most important observations
-- **Potential Root Causes**: Likely causes based on log patterns
+- **Potential Root Causes**: Likely causes based on log patterns and code changes
+- **Code Change Impact**: (if PR diff provided) How the code changes might relate to the issues
 - **Recommended Actions**: Specific next steps
 - **Additional Investigation**: Areas to explore further
+
+For reset investigations with PR diffs, pay special attention to:
+- Resource usage changes (memory, CPU, connections)
+- New dependencies or configuration changes
+- Error handling modifications
+- Performance-impacting code changes
+- Breaking changes or API modifications
 
 Be concise but thorough. Focus on actionable insights.`,
 
@@ -115,7 +124,8 @@ Request trace documents:`,
       },
       defaultPrompt: 'We are investigating a reset scenario. These are all the logs since the pod\'s last initialization. Do you see something that can indicate a problem that will cause this container to reset?',
       tags: ['reset', 'pod-lifecycle', 'debugging'],
-      specialBehavior: PresetBehavior.RESET_INVESTIGATION
+      specialBehavior: PresetBehavior.RESET_INVESTIGATION,
+      gitHubRepo: 'pymobiengine' // Override GitHub repo for commit lookups
     }
   ],
 
@@ -207,6 +217,7 @@ export interface Preset {
   defaultPrompt: string;
   tags: string[];
   specialBehavior?: PresetBehavior; // Enum for type-safe special handling
+  gitHubRepo?: string; // Override GitHub repo for commit lookups
 }
 
 // Preset helper functions

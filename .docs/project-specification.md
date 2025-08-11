@@ -69,14 +69,16 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 
 ### 4. ElasticsearchService (Operational Logs)
 - **File**: `src/services/ElasticsearchService.ts`
-- **Purpose**: Fetches contextual logs for alert correlation
+- **Purpose**: Fetches contextual logs for alert correlation and reset investigation
 - **Implementation**: Direct HTTP requests (not Elasticsearch client)
 - **Log Types Retrieved** (configurable via UI settings):
   - **General Logs**: Configurable number (default 100) of general application logs
   - **Error Logs**: Configurable number (default 100) of ERROR-level logs (`json.levelname = "ERROR"`)
   - **Time Debugger Logs**: Configurable number (default 100) of TIME_DEBUGGER [SLOW] logs (`[TIME_DEBUGGER] [SLOW]` in message)
   - **Slow Request Logs**: Configurable number (default 100) of logs where `json.extra.request_time > threshold` (configurable threshold, default 1s)
-- **Search Field**: `json.hostname` (exact match on pod name using term queries)
+- **Search Field**: `json.hostname` (exact match on pod name using `term` queries for precise filtering)
+- **Reset Investigation**: Specialized methods for finding Git commit logs and fetching logs since pod initialization
+- **Query Optimization**: Uses `match` queries for flexible text search and `term` queries for exact field matching
 - **Configuration**: Document limits and slow request thresholds configurable via Elasticsearch Settings panel in UI
 
 ### 5. GrafanaService (Metrics & Dashboards)
@@ -113,9 +115,14 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 
 ### Elasticsearch
 - **Endpoint**: Custom `/search/_search` path (not standard Elasticsearch)
-- **Authentication**: Basic Auth (username/password)
+- **Authentication**: Basic Auth (username/password) or API Key
 - **Index Pattern**: `app-logs*`
 - **Implementation**: Direct HTTP POST requests (fetch API)
+- **Query Types**: 
+  - `term` queries for exact field matching (hostnames, log levels)
+  - `match` queries for flexible text search (message content)
+  - `range` queries for timestamp and numeric filtering
+- **Key Fields**: `json.hostname` for pod identification, `json.message` for Git commit detection
 
 ### Grafana API
 - **Endpoint**: Grafana HTTP API for querying Prometheus data sources
@@ -238,6 +245,10 @@ npm run quick "" <podname>  # General log analysis without alert context
 - `npm run simple`: Basic demo functionality
 - `npm run build`: Compile TypeScript
 - `npm run dev`: Development mode
+- `npm run server`: Start API server only
+- `npm run gui:dev`: Start both API and UI development servers
+- `npm run gui:build`: Build production UI
+- `npm run gui:preview`: Preview built UI
 
 ## Output Example
 
@@ -329,11 +340,14 @@ Based on the alert and logs, there are several indicators of system stress:
 - **OpenAI API Failure**: Skips explanations, continues with other data
 - **Elasticsearch Unavailable**: Shows "No logs found" but continues processing
 - **Network Issues**: Timeout handling with informative error messages
+- **Hostname Filtering**: Uses precise `term` queries to prevent cross-pod log contamination
+- **Git Commit Search**: Flexible `match` queries for finding commit logs with debug fallbacks
 
 ### Health Checks
 - **GitHub**: Repository access test
 - **OpenAI**: Simple completion test
-- **Elasticsearch**: Direct endpoint connectivity test
+- **Elasticsearch**: Direct endpoint connectivity test with authentication validation
+- **Grafana**: API connectivity and datasource proxy validation
 
 ### Logging Strategy
 - **Console Logging**: Structured with emojis for easy scanning
@@ -383,8 +397,10 @@ examples/              # Example alert data
 
 ### Endpoints
 - `GET /api/health`: returns `{ github, openai, elasticsearch, grafana }` connectivity.
-- `POST /api/quick`: `{ alertname, pod, elasticSettings? }` → `ContextOutput` (with structured fields). Alert name is optional, elasticSettings configures document limits and thresholds.
+- `POST /api/quick`: `{ alertname, pod, elasticSettings?, logTypes?, preset?, specialBehavior? }` → `ContextOutput` (with structured fields). Alert name is optional, elasticSettings configures document limits and thresholds.
 - `POST /api/alert`: `Alert` JSON → `ContextOutput`.
+- `POST /api/request-trace`: `{ requestId }` → Request flow analysis for debugging.
+- `POST /api/generate-debug-prompt`: `{ requestId, documents, customPrompt? }` → Contextual debugging prompt generation.
 
 ### NPM Scripts
 - `server`: start API only
