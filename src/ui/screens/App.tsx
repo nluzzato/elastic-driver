@@ -10,6 +10,7 @@ import { LogTable } from '../components/LogTable';
 import { LogModal } from '../components/LogModal';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { defaultElasticSettings, prometheusAlertPrompt, aiAnalysisPrompt } from '../../config/application';
 
 type Health = {
   ok: boolean;
@@ -42,15 +43,11 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('recent');
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
-  const [elasticSettings, setElasticSettings] = useState<ElasticSettings>({
-    timeframeMinutes: 60,
-    documentLimit: 100,
-    slowRequestThreshold: 1
-  });
+  const [elasticSettings, setElasticSettings] = useState<ElasticSettings>(defaultElasticSettings);
   const [showElasticSettings, setShowElasticSettings] = useState(false);
   const [aiPromptSettings, setAIPromptSettings] = useState<AIPromptSettings>({
-    explanationPrompt: "You are a Prometheus expert explaining PromQL to experienced software engineers. Be concise and technical. Focus on: what metric is being measured, the threshold/condition that triggers the alert, and the immediate system impact. Assume familiarity with observability concepts.",
-    analysisPrompt: "You are an SRE analyzing production issues for experienced engineers. Be concise and technical. Correlate alert data with logs to identify root causes and provide actionable next steps. Use markdown formatting: ## headers, **bold** for key points, `code` for technical details. Skip basic explanations - focus on analysis and solutions."
+    explanationPrompt: prometheusAlertPrompt,
+    analysisPrompt: aiAnalysisPrompt
   });
   const [showAIPromptSettings, setShowAIPromptSettings] = useState(false);
 

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { Config } from '../types';
+import { prometheusAlertPrompt, aiAnalysisPrompt, contextualDebugPrompt } from '../config/application';
 
 /**
  * OpenAI Query Service - Explains Prometheus queries in human language
@@ -38,7 +39,7 @@ export class OpenAIQueryService {
         messages: [
           {
             role: 'system',
-            content: 'You are a Prometheus expert explaining PromQL to experienced software engineers. Be concise and technical. Focus on: what metric is being measured, the threshold/condition that triggers the alert, and the immediate system impact. Assume familiarity with observability concepts.'
+            content: prometheusAlertPrompt
           },
           {
             role: 'user',
@@ -208,7 +209,7 @@ Provide a clear assessment and actionable recommendations. Format your response 
         messages: [
           {
             role: 'system',
-            content: 'You are an SRE analyzing production issues for experienced engineers. Be concise and technical. Correlate alert data with logs to identify root causes and provide actionable next steps. Use markdown formatting: ## headers, **bold** for key points, `code` for technical details. Skip basic explanations - focus on analysis and solutions.'
+            content: aiAnalysisPrompt
           },
           {
             role: 'user',
@@ -230,6 +231,73 @@ Provide a clear assessment and actionable recommendations. Format your response 
     } catch (error) {
       console.error('❌ OpenAI analysis error:', error);
       return 'Error generating analysis - OpenAI API failed';
+    }
+  }
+
+  /**
+   * Generate contextual debugging prompt for coding agents
+   */
+  async generateContextualDebugPrompt(
+    requestId: string,
+    documents: any[],
+    customPrompt?: string
+  ): Promise<string> {
+    if (!this.enabled || !this.openai) {
+      return 'OpenAI service not available - cannot generate debug prompt';
+    }
+
+    try {
+      console.log(`🔍 Generating contextual debug prompt for request ${requestId} with ${documents.length} documents...`);
+
+      // Build the user prompt with all documents
+      let userPrompt = `Request ID: ${requestId}\n\nDocuments (${documents.length} total):\n\n`;
+
+      documents.forEach((doc, index) => {
+        userPrompt += `--- Document ${index + 1} ---\n`;
+        userPrompt += `Timestamp: ${doc['@timestamp']}\n`;
+        userPrompt += `Level: ${doc.json?.levelname || 'unknown'}\n`;
+        userPrompt += `Message: ${doc.json?.message || 'no message'}\n`;
+        userPrompt += `Pod: ${doc.json?.hostname || 'unknown'}\n`;
+        
+        // Include other relevant fields
+        if (doc.json?.service_name) userPrompt += `Service: ${doc.json.service_name}\n`;
+        if (doc.json?.module) userPrompt += `Module: ${doc.json.module}\n`;
+        if (doc.json?.extra?.request_time) userPrompt += `Request Time: ${doc.json.extra.request_time}s\n`;
+        if (doc.json?.stack_trace) userPrompt += `Stack Trace: ${doc.json.stack_trace}\n`;
+        if (doc.json?.exception) userPrompt += `Exception: ${doc.json.exception}\n`;
+        
+        // Include full JSON for comprehensive context
+        userPrompt += `Full Document: ${JSON.stringify(doc, null, 2)}\n\n`;
+      });
+
+      const completion = await this.openai.chat.completions.create({
+        model: 'o3-mini', // Using reasoning model for complex analysis
+        messages: [
+          {
+            role: 'system',
+            content: customPrompt || contextualDebugPrompt
+          },
+          {
+            role: 'user',
+            content: userPrompt
+          }
+        ],
+        max_completion_tokens: 3000,
+        temperature: 0.3,
+      });
+
+      const debugPrompt = completion.choices[0]?.message?.content?.trim();
+      
+      if (!debugPrompt) {
+        return 'Could not generate debug prompt';
+      }
+
+      console.log('✅ Contextual debug prompt generated');
+      return debugPrompt;
+
+    } catch (error) {
+      console.error('❌ OpenAI debug prompt generation error:', error);
+      return 'Error generating debug prompt - OpenAI API failed';
     }
   }
 

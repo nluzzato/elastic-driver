@@ -110,7 +110,8 @@ export class ElasticsearchService {
           'applicationName',
           'ct_deployment',
           'ct_feature',
-          'ct_kind'
+          'ct_kind',
+          'json.request_id'
         ]
       };
 
@@ -158,7 +159,8 @@ export class ElasticsearchService {
           service: source.json?.service_name,
           module: source.json?.module,
           environment: source.json?.environment,
-          applicationName: source.applicationName
+          applicationName: source.applicationName,
+          requestId: source.json?.request_id
         };
       });
 
@@ -246,6 +248,7 @@ export class ElasticsearchService {
           'json.module',
           'json.environment',
           'json.extra.request_time',
+          'json.request_id',
           'applicationName',
           'ct_deployment',
           'ct_feature',
@@ -287,7 +290,8 @@ export class ElasticsearchService {
           module: source.json?.module,
           environment: source.json?.environment,
           applicationName: source.applicationName,
-          requestTime: source.json?.extra?.request_time // Include request time for display
+          requestTime: source.json?.extra?.request_time, // Include request time for display
+          requestId: source.json?.request_id
         };
       });
 
@@ -305,6 +309,77 @@ export class ElasticsearchService {
       
       // Return empty array instead of throwing to allow graceful degradation
       return [];
+    }
+  }
+
+  /**
+   * Get all logs for a specific request ID across all pods and timeframes
+   * Used for request flow analysis and debugging
+   */
+  async getAllLogsByRequestId(requestId: string, maxDocs: number = 1000): Promise<any[]> {
+    if (!this.enabled) {
+      console.log('ℹ️  Elasticsearch not enabled, skipping request trace');
+      return [];
+    }
+
+    try {
+      console.log(`🔍 Fetching all logs for request ID: ${requestId}`);
+
+      const searchQuery = {
+        query: {
+          bool: {
+            must: [
+              {
+                term: {
+                  'json.request_id.keyword': requestId
+                }
+              }
+            ]
+          }
+        },
+        sort: [
+          {
+            '@timestamp': {
+              order: 'asc' // Chronological order for request flow
+            }
+          }
+        ],
+        size: maxDocs,
+        _source: '*' // Get all fields for comprehensive context
+      };
+
+      console.log(`📡 Request trace query:`, JSON.stringify(searchQuery, null, 2));
+
+      const response = await fetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}`
+        },
+        body: JSON.stringify(searchQuery)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Elasticsearch request trace error response:', errorText);
+        throw new Error(`Elasticsearch query failed with status ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      const hits = data.hits?.hits || [];
+
+      console.log(`✅ Found ${hits.length} documents for request ID ${requestId}`);
+      
+      // Return the full documents for AI analysis
+      return hits.map((hit: any) => ({
+        ...hit._source,
+        _id: hit._id,
+        _index: hit._index
+      }));
+
+    } catch (error: any) {
+      console.error('❌ Request trace query failed:', error);
+      throw error; // Re-throw for caller to handle
     }
   }
 

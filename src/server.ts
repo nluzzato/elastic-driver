@@ -78,6 +78,70 @@ app.post('/api/alert', async (req, res) => {
   }
 });
 
+// Request flow analysis and contextual debugging
+app.post('/api/request-trace', async (req, res) => {
+  const { requestId } = req.body || {};
+  if (!requestId) {
+    return res.status(400).json({ error: 'requestId is required' });
+  }
+
+  try {
+    validateConfig();
+    const service = new SimpleAlertService(appConfig);
+    
+    // Get all documents for the request ID
+    const documents = await service.elasticsearchService.getAllLogsByRequestId(requestId);
+    
+    if (documents.length === 0) {
+      return res.json({ 
+        requestId,
+        documents: [],
+        message: 'No documents found for this request ID'
+      });
+    }
+
+    res.json({
+      requestId,
+      documents,
+      documentCount: documents.length,
+      timeRange: {
+        start: documents[0]?.['@timestamp'],
+        end: documents[documents.length - 1]?.['@timestamp']
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch request trace' });
+  }
+});
+
+// Generate contextual debugging prompt
+app.post('/api/generate-debug-prompt', async (req, res) => {
+  const { requestId, documents, customPrompt } = req.body || {};
+  if (!requestId || !documents) {
+    return res.status(400).json({ error: 'requestId and documents are required' });
+  }
+
+  try {
+    validateConfig();
+    const service = new SimpleAlertService(appConfig);
+    
+    // Generate contextual debugging prompt using o3-mini
+    const debugPrompt = await service.openaiService.generateContextualDebugPrompt(
+      requestId,
+      documents,
+      customPrompt
+    );
+
+    res.json({
+      requestId,
+      debugPrompt,
+      documentCount: documents.length
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to generate debug prompt' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🟢 API server listening on http://localhost:${PORT}`);
 });
