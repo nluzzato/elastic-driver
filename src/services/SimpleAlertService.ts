@@ -53,11 +53,11 @@ export class SimpleAlertService {
     const podName = alert.details?.pod;
     if (podName && this.elasticsearchService.isEnabled()) {
       try {
-        // Fetch general logs, error logs, and TIME_DEBUGGER logs in parallel
+        // Fetch general logs, error logs, and SLOW TIME_DEBUGGER logs in parallel
         [logs, errorLogs, timeDebuggerLogs] = await Promise.all([
           this.elasticsearchService.getLastLogsForPod(podName, 100),
           this.elasticsearchService.getLastLogsForPod(podName, 100, 'ERROR'),
-          this.elasticsearchService.getLastLogsForPod(podName, 100, undefined, '[TIME_DEBUGGER]')
+          this.elasticsearchService.getLastLogsForPod(podName, 100, undefined, '[TIME_DEBUGGER] [SLOW]')
         ]);
       } catch (error) {
         console.warn('⚠️  Failed to fetch logs from Elasticsearch:', error);
@@ -126,9 +126,10 @@ export class SimpleAlertService {
       text += `❌ No expression found in GitHub repository\n`;
     }
 
-    // Add logs section if available
-    if (logs && logs.length > 0) {
-      text += `\n📋 Recent Logs (Last ${logs.length}):\n`;
+            // Add logs section if available
+        if (logs && logs.length > 0) {
+          const timeframe = this.calculateLogTimeframe(logs);
+          text += `\n📋 Recent Logs (Last ${logs.length}${timeframe}):\n`;
       
       // Show first 5 logs as summary
       const recentLogs = logs.slice(0, 5);
@@ -154,7 +155,8 @@ export class SimpleAlertService {
 
     // Add error logs section if available
     if (errorLogs && errorLogs.length > 0) {
-      text += `\n🔴 Recent ERROR Logs (Last ${errorLogs.length}):\n`;
+      const errorTimeframe = this.calculateLogTimeframe(errorLogs);
+      text += `\n🔴 Recent ERROR Logs (Last ${errorLogs.length}${errorTimeframe}):\n`;
       
       // Show first 10 error logs (more important than general logs)
       const recentErrors = errorLogs.slice(0, 10);
@@ -173,9 +175,10 @@ export class SimpleAlertService {
       text += `\n🔴 Recent ERROR Logs: No error logs found for pod ${alert.details.pod}\n`;
     }
 
-    // Add TIME_DEBUGGER logs section if available
+    // Add SLOW performance logs section if available
     if (timeDebuggerLogs && timeDebuggerLogs.length > 0) {
-      text += `\n⏱️ TIME_DEBUGGER Logs (Last ${timeDebuggerLogs.length}):\n`;
+      const slowTimeframe = this.calculateLogTimeframe(timeDebuggerLogs);
+      text += `\n⏱️ SLOW Performance Logs (Last ${timeDebuggerLogs.length}${slowTimeframe}):\n`;
       
       // Show first 10 time debugger logs
       const recentTimeDebugger = timeDebuggerLogs.slice(0, 10);
@@ -192,8 +195,8 @@ export class SimpleAlertService {
         text += `... and ${timeDebuggerLogs.length - 10} more TIME_DEBUGGER entries\n`;
       }
     } else if (alert.details?.pod && logs && logs.length > 0) {
-      text += `\n⏱️ TIME_DEBUGGER Logs: No TIME_DEBUGGER logs found for pod ${alert.details.pod}\n`;
-    }
+                text += `\n⏱️ SLOW Performance Logs: No SLOW performance logs found for pod ${alert.details.pod}\n`;
+        }
 
     // Add AI analysis section if available
     if (aiAnalysis) {
@@ -257,9 +260,9 @@ export class SimpleAlertService {
   /**
    * Summarize log levels
    */
-  private summarizeLogLevels(logs: LogEntry[]): string {
+    private summarizeLogLevels(logs: LogEntry[]): string {
     const counts: Record<string, number> = {};
-    
+
     logs.forEach(log => {
       const level = log.level.toLowerCase();
       counts[level] = (counts[level] || 0) + 1;
@@ -270,5 +273,24 @@ export class SimpleAlertService {
       .join(', ');
 
     return summary || 'No log levels detected';
+  }
+
+  private calculateLogTimeframe(logs: LogEntry[]): string {
+    if (logs.length === 0) return '';
+    
+    const timestamps = logs.map(log => new Date(log.timestamp).getTime());
+    const newest = Math.max(...timestamps);
+    const oldest = Math.min(...timestamps);
+    const diffMs = newest - oldest;
+    
+    if (diffMs < 1000) {
+      return ' - <1s timespan';
+    } else if (diffMs < 60000) {
+      return ` - ${Math.round(diffMs / 1000)}s timespan`;
+    } else if (diffMs < 3600000) {
+      return ` - ${Math.round(diffMs / 60000)}m timespan`;
+    } else {
+      return ` - ${Math.round(diffMs / 3600000)}h timespan`;
+    }
   }
 }

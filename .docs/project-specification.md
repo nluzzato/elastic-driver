@@ -21,7 +21,7 @@ The Alert Context Agent is a Node.js/TypeScript service that provides comprehens
 ## Architecture Overview
 
 ```
-Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch Logs] → [AI Analysis] → Enhanced Output
+Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch Logs] → [Grafana Metrics] → [AI Analysis] → Enhanced Output
 ```
 
 ### Data Flow
@@ -29,8 +29,9 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 2. **GitHub Enrichment**: Search for alert rule definition in `Connecteam/alerts` repository
 3. **OpenAI Explanation**: Generate human-readable explanation of PromQL query
 4. **Log Fetching**: Parallel retrieval of 3 log types from Elasticsearch
-5. **AI Analysis**: Comprehensive analysis using o3-mini model
-6. **Output**: Formatted context with technical details, explanations, logs, and recommendations
+5. **Metrics Fetching**: Query Grafana/Prometheus for current values and trends
+6. **AI Analysis**: Comprehensive analysis using o3-mini model with metrics + logs
+7. **Output**: Formatted context with technical details, explanations, logs, metrics, and recommendations
 
 ## Core Services Architecture
 
@@ -71,8 +72,18 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 - **Log Types Retrieved**:
   - **General Logs**: Last 100 general application logs
   - **Error Logs**: Last 100 ERROR-level logs (`json.levelname = "ERROR"`)
-  - **Performance Logs**: Last 100 TIME_DEBUGGER logs (`[TIME_DEBUGGER]` in message)
+  - **Performance Logs**: Last 100 TIME_DEBUGGER [SLOW] logs (`[TIME_DEBUGGER] [SLOW]` in message)
 - **Search Field**: `json.hostname` (matches pod name)
+
+### 5. GrafanaService (Metrics & Dashboards)
+- **File**: `src/services/GrafanaService.ts`
+- **Purpose**: Fetches Prometheus metrics and dashboard context via Grafana API
+- **Implementation**: Grafana HTTP API with API Key authentication
+- **Metrics Retrieved**:
+  - **Alert Metric**: Current value of the alerting metric
+  - **Related Metrics**: CPU, memory, network, disk for the pod/container
+  - **Trend Data**: Historical values to show if issue is escalating
+- **Dashboard Context**: Links to relevant Grafana dashboards
 
 ## Data Sources
 
@@ -96,6 +107,15 @@ Alert Input → [GitHub Integration] → [OpenAI Explanation] → [Elasticsearch
 - **Index Pattern**: `app-logs*`
 - **Implementation**: Direct HTTP POST requests (fetch API)
 
+### Grafana API
+- **Endpoint**: Grafana HTTP API for querying Prometheus data sources
+- **Authentication**: API Key (GRAFANA_API_KEY)
+- **Capabilities**: 
+  - Query Prometheus metrics via `/api/datasources/proxy/:id/api/v1/query`
+  - Query range data via `/api/datasources/proxy/:id/api/v1/query_range`
+  - Dashboard links and annotations
+- **Implementation**: Direct HTTP requests with Bearer token authentication
+
 ## Configuration Management
 
 ### Environment Variables
@@ -113,6 +133,11 @@ ELASTICSEARCH_URL=https://qa.dev.connecteam.com:9000/search
 ELASTICSEARCH_USERNAME=username
 ELASTICSEARCH_PASSWORD=password
 ELASTICSEARCH_INDEX_PATTERN=app-logs*
+
+# Grafana Configuration
+GRAFANA_URL=https://grafana.connecteam.com
+GRAFANA_API_KEY=glsa_xxxxxxxxxxxx
+GRAFANA_TIMEOUT=30000
 ```
 
 ### Configuration Loading
@@ -277,7 +302,6 @@ src/
 
 .docs/               # Project documentation
 examples/            # Example alert data
-legacy/             # Deprecated code (kept for reference)
 ```
 
 ### TypeScript Configuration

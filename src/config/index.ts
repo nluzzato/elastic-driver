@@ -13,13 +13,18 @@ export const config: Config = {
   openai: {
     apiKey: process.env.OPEN_AI_KEY,
   },
-  elasticsearch: {
+    elasticsearch: {
     url: process.env.ELASTICSEARCH_URL,
     username: process.env.ELASTICSEARCH_USERNAME,
     password: process.env.ELASTICSEARCH_PASSWORD,
     apiKey: process.env.ELASTICSEARCH_API_KEY,
-              indexPattern: process.env.ELASTICSEARCH_INDEX_PATTERN || 'app-logs*',
+    indexPattern: process.env.ELASTICSEARCH_INDEX_PATTERN || 'app-logs*',
     timeout: parseInt(process.env.ELASTICSEARCH_TIMEOUT || '30000')
+  },
+  grafana: {
+    url: process.env.GRAFANA_URL,
+    apiKey: process.env.GRAFANA_API_KEY,
+    timeout: parseInt(process.env.GRAFANA_TIMEOUT || '30000')
   },
   knownAlertFiles: [
     'default_alerts/k8s_alerts.yaml',
@@ -45,6 +50,11 @@ export const validateConfig = (): void => {
   if (!config.elasticsearch.url) {
     console.warn('⚠️  ELASTICSEARCH_URL not found in environment variables');
     console.warn('   Log fetching will be disabled');
+  }
+
+  if (!config.grafana.url || !config.grafana.apiKey) {
+    console.warn('⚠️  GRAFANA_URL or GRAFANA_API_KEY not found in environment variables');
+    console.warn('   Metrics fetching will be disabled');
   }
 
   if (config.knownAlertFiles.length === 0) {

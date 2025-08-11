@@ -104,6 +104,11 @@ export interface Config {
     indexPattern: string;
     timeout: number;
   };
+  grafana: {
+    url?: string;
+    apiKey?: string;
+    timeout: number;
+  };
   knownAlertFiles: string[];
 }
 
@@ -126,3 +131,44 @@ export interface ContextOutput {
 export type SeverityLevel = 'critical' | 'warning' | 'info';
 export type AlertStatus = 'FIRING' | 'RESOLVED';
 export type SearchSource = 'github' | 'mock' | 'error' | 'none';
+
+// Grafana/Prometheus types
+export interface MetricValue {
+  timestamp: number;
+  value: string;
+}
+
+export interface MetricSeries {
+  metric: Record<string, string>;
+  values?: MetricValue[];
+  value?: MetricValue;
+}
+
+export interface PrometheusQueryResult {
+  status: 'success' | 'error';
+  data: {
+    resultType: 'matrix' | 'vector' | 'scalar' | 'string';
+    result: MetricSeries[];
+  };
+  error?: string;
+}
+
+export interface GrafanaMetricData {
+  query: string;
+  currentValue?: number;
+  threshold?: number;
+  unit?: string;
+  trend?: 'up' | 'down' | 'stable';
+  percentageChange?: number;
+  dashboardUrl?: string;
+}
+
+export interface MetricsContext {
+  alertMetric?: GrafanaMetricData;
+  relatedMetrics: GrafanaMetricData[];
+  timeframe: {
+    start: Date;
+    end: Date;
+    duration: string;
+  };
+}
