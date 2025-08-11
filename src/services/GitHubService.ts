@@ -308,4 +308,42 @@ export class GitHubService {
     
     return alertRule;
   }
+
+  /**
+   * Check if the service is enabled (has token)
+   */
+  isEnabled(): boolean {
+    return !!this.token;
+  }
+
+  /**
+   * Get commit details by commit hash
+   * Used for reset investigation to get commit info from logs
+   */
+  async getCommitDetails(commitHash: string): Promise<{ title: string; message: string; author: string; date: string } | null> {
+    if (!this.isEnabled()) {
+      console.warn('⚠️  GitHub service not enabled - cannot fetch commit details');
+      return null;
+    }
+
+    try {
+      console.log(`🔍 Fetching commit details for: ${commitHash}`);
+      
+      const endpoint = `/repos/${this.owner}/${this.repo}/commits/${commitHash}`;
+      const data = await this.makeRequest(endpoint);
+      
+      const commitInfo = {
+        title: data.commit?.message?.split('\n')[0] || 'No commit message',
+        message: data.commit?.message || 'No commit message',
+        author: data.commit?.author?.name || data.author?.login || 'Unknown',
+        date: data.commit?.author?.date || data.commit?.committer?.date || 'Unknown'
+      };
+      
+      console.log(`✅ Found commit: "${commitInfo.title}" by ${commitInfo.author}`);
+      return commitInfo;
+    } catch (error) {
+      console.error(`❌ Error fetching commit ${commitHash}:`, error);
+      return null;
+    }
+  }
 }

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { config as appConfig, validateConfig } from './config';
 import { SimpleAlertService } from './services/SimpleAlertService';
+import { getPresetById, PresetBehavior } from './config/application';
 import { Alert } from './types';
 
 const app = express();
@@ -64,7 +65,12 @@ app.post('/api/quick', async (req, res) => {
   try {
     validateConfig();
     const service = new SimpleAlertService(appConfig);
-    const context = await service.processAlert(alert, settings, enabledLogTypes);
+    
+    // Get preset behavior if preset is specified
+    const presetData = preset ? getPresetById(preset) : null;
+    const specialBehavior = presetData?.specialBehavior;
+    
+    const context = await service.processAlert(alert, settings, enabledLogTypes, specialBehavior);
     res.json(context);
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to process alert' });

@@ -341,6 +341,179 @@ export class ElasticsearchService {
   }
 
   /**
+   * Search for Git commit info logs to find pod initialization timestamp
+   * Returns the most recent "Git info: commit" entries for reset investigation
+   */
+  async findGitCommitLogs(podName: string, timeframeMinutes: number = 240): Promise<{ timestamp: string; commitHash: string; fullMessage: string }[]> {
+    if (!this.enabled) {
+      console.warn('⚠️  Elasticsearch not available - cannot search Git commit logs');
+      return [];
+    }
+
+    try {
+      console.log(`🔍 Searching for Git commit logs for pod: ${podName} (last ${timeframeMinutes}min)`);
+      
+      const timeFrom = new Date(Date.now() - timeframeMinutes * 60 * 1000).toISOString();
+      
+      const searchQuery = {
+        query: {
+          bool: {
+            must: [
+              {
+                match: {
+                  'json.hostname': podName
+                }
+              },
+              {
+                match_phrase: {
+                  'json.message': 'Git info: commit'
+                }
+              },
+              {
+                range: {
+                  '@timestamp': {
+                    gte: timeFrom
+                  }
+                }
+              }
+            ]
+          }
+        },
+        sort: [
+          {
+            '@timestamp': {
+              order: 'desc' // Most recent first
+            }
+          }
+        ],
+        size: 5, // Get up to 5 recent commits
+        _source: ['@timestamp', 'json.message', 'json.hostname']
+      };
+
+      const response = await fetch(`${this.config.url}/logs-*/_search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.config.auth && { 'Authorization': this.config.auth })
+        },
+        body: JSON.stringify(searchQuery)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Elasticsearch search failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const hits = data.hits?.hits || [];
+      
+      console.log(`📊 Found ${hits.length} Git commit log entries`);
+
+      const commitLogs = hits.map((hit: any) => {
+        const source = hit._source;
+        const message = source.json?.message || '';
+        
+        // Extract commit hash from message like "Git info: commit a1b2c3d4"
+        const commitHashMatch = message.match(/Git info: commit ([a-f0-9]{8})/);
+        const commitHash = commitHashMatch ? commitHashMatch[1] : '';
+        
+        return {
+          timestamp: source['@timestamp'],
+          commitHash,
+          fullMessage: message
+        };
+      }).filter(log => log.commitHash); // Only return logs with valid commit hashes
+
+      console.log(`✅ Found ${commitLogs.length} valid Git commit entries`);
+      return commitLogs;
+    } catch (error) {
+      console.error('❌ Error searching Git commit logs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all logs for a pod since a specific timestamp
+   * Used for reset investigation to get logs since pod initialization
+   */
+  async getLogsSinceTimestamp(podName: string, sinceTimestamp: string, limit: number = 500): Promise<LogEntry[]> {
+    if (!this.enabled) {
+      console.warn('⚠️  Elasticsearch not available - cannot fetch logs since timestamp');
+      return [];
+    }
+
+    try {
+      console.log(`🔍 Fetching logs for pod ${podName} since ${sinceTimestamp} (limit: ${limit})`);
+      
+      const searchQuery = {
+        query: {
+          bool: {
+            must: [
+              {
+                match: {
+                  'json.hostname': podName
+                }
+              },
+              {
+                range: {
+                  '@timestamp': {
+                    gte: sinceTimestamp
+                  }
+                }
+              }
+            ]
+          }
+        },
+        sort: [
+          {
+            '@timestamp': {
+              order: 'asc' // Chronological order for reset analysis
+            }
+          }
+        ],
+        size: limit,
+        _source: ['@timestamp', 'json.levelname', 'json.message', 'json.hostname', 'json.service_name', 'json.module', 'json.request_id']
+      };
+
+      const response = await fetch(`${this.config.url}/logs-*/_search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.config.auth && { 'Authorization': this.config.auth })
+        },
+        body: JSON.stringify(searchQuery)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Elasticsearch search failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const hits = data.hits?.hits || [];
+      
+      console.log(`📊 Found ${hits.length} logs since timestamp`);
+
+      const logs = hits.map((hit: any) => {
+        const source = hit._source;
+        return {
+          timestamp: source['@timestamp'],
+          level: source.json?.levelname || 'INFO',
+          message: source.json?.message || '',
+          pod: source.json?.hostname || podName,
+          service: source.json?.service_name,
+          module: source.json?.module,
+          requestId: source.json?.request_id
+        };
+      });
+
+      console.log(`✅ Retrieved ${logs.length} logs since pod initialization`);
+      return logs;
+    } catch (error) {
+      console.error('❌ Error fetching logs since timestamp:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get all logs for a specific request ID across all pods and timeframes
    * Used for request flow analysis and debugging
    */

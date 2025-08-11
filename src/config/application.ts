@@ -84,7 +84,28 @@ Request trace documents:`,
         timeDebugger: true
       },
       defaultPrompt: 'Analyze this alert and related logs to understand the issue and provide actionable recommendations.',
-      tags: ['default', 'comprehensive']
+      tags: ['default', 'comprehensive'],
+      specialBehavior: PresetBehavior.STANDARD
+    },
+    {
+      id: 'reset-investigation',
+      name: 'Reset Investigation',
+      description: 'Investigate pod resets by analyzing logs since last pod initialization',
+      icon: '🔄',
+      elasticSettings: {
+        timeframeMinutes: 240, // 4 hours initial search window
+        documentLimit: 500,    // More logs since we're looking at full pod lifecycle
+        slowRequestThreshold: 2.0
+      },
+      logTypes: {
+        general: true,
+        error: true,
+        slow: false,  // Focus on errors and general logs for reset analysis
+        timeDebugger: false
+      },
+      defaultPrompt: 'We are investigating a reset scenario. These are all the logs since the pod\'s last initialization. Do you see something that can indicate a problem that will cause this container to reset?',
+      tags: ['reset', 'pod-lifecycle', 'debugging'],
+      specialBehavior: PresetBehavior.RESET_INVESTIGATION
     }
   ],
 
@@ -156,6 +177,16 @@ export type ElasticSettings = typeof defaultElasticSettings;
 export type AiSettings = typeof defaultAiSettings;
 export type RequestTracingConfig = typeof requestTracing;
 
+// Special behavior types for presets
+export enum PresetBehavior {
+  STANDARD = 'standard',
+  RESET_INVESTIGATION = 'reset-investigation',
+  PERFORMANCE_ANALYSIS = 'performance-analysis',
+  SECURITY_AUDIT = 'security-audit',
+  CAPACITY_PLANNING = 'capacity-planning',
+  ERROR_CORRELATION = 'error-correlation'
+}
+
 // Preset type definitions
 export interface Preset {
   id: string;
@@ -175,6 +206,7 @@ export interface Preset {
   };
   defaultPrompt: string;
   tags: string[];
+  specialBehavior?: PresetBehavior; // Enum for type-safe special handling
 }
 
 // Preset helper functions
@@ -188,4 +220,12 @@ export const getDefaultPreset = (): Preset => {
 
 export const getPresetsByTag = (tag: string): Preset[] => {
   return presets.filter(preset => preset.tags.includes(tag));
+};
+
+export const getPresetsByBehavior = (behavior: PresetBehavior): Preset[] => {
+  return presets.filter(preset => preset.specialBehavior === behavior);
+};
+
+export const hasSpecialBehavior = (preset: Preset): boolean => {
+  return preset.specialBehavior !== undefined && preset.specialBehavior !== PresetBehavior.STANDARD;
 };
