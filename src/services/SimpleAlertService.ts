@@ -33,7 +33,7 @@ export class SimpleAlertService {
     
     // Get OpenAI explanation if we found a rule and OpenAI is enabled
     let aiExplanation: string | undefined;
-    if (githubResult.found && githubResult.rule && this.openaiService.isEnabled()) {
+    if (alertname && alertname !== 'Unknown' && alertname !== '' && githubResult.found && githubResult.rule && this.openaiService.isEnabled()) {
       try {
         aiExplanation = await this.openaiService.explainPrometheusQuery(
           githubResult.rule.expression,
@@ -47,6 +47,8 @@ export class SimpleAlertService {
       } catch (error) {
         console.warn('⚠️  Failed to get OpenAI explanation:', error);
       }
+    } else if (!alertname || alertname === 'Unknown' || alertname === '') {
+      aiExplanation = 'No alert data provided';
     }
     
     // Get logs from Elasticsearch if enabled and we have a pod name
@@ -59,15 +61,16 @@ export class SimpleAlertService {
       try {
         const limit = elasticSettings?.documentLimit || 100;
         const slowThreshold = elasticSettings?.slowRequestThreshold || 1;
+        const timeframeMinutes = elasticSettings?.timeframeMinutes;
         
-        console.log(`📊 Using Elasticsearch settings: ${limit} docs, ${slowThreshold}s slow threshold`);
+        console.log(`📊 Using Elasticsearch settings: ${limit} docs, ${slowThreshold}s slow threshold, ${timeframeMinutes || 'no'} timeframe`);
         
         // Fetch general logs, error logs, TIME_DEBUGGER logs, and slow request logs in parallel
         [logs, errorLogs, timeDebuggerLogs, slowRequestLogs] = await Promise.all([
-          this.elasticsearchService.getLastLogsForPod(podName, limit),
-          this.elasticsearchService.getLastLogsForPod(podName, limit, 'ERROR'),
-          this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, '[TIME_DEBUGGER] [SLOW]'),
-          this.elasticsearchService.getLastSlowRequestLogsForPod(podName, limit, slowThreshold)
+          this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, undefined, timeframeMinutes),
+          this.elasticsearchService.getLastLogsForPod(podName, limit, 'ERROR', undefined, timeframeMinutes),
+          this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, '[TIME_DEBUGGER] [SLOW]', timeframeMinutes),
+          this.elasticsearchService.getLastSlowRequestLogsForPod(podName, limit, slowThreshold, timeframeMinutes)
         ]);
       } catch (error) {
         console.warn('⚠️  Failed to fetch logs from Elasticsearch:', error);

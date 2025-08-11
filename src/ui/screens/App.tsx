@@ -8,6 +8,7 @@ import { CodeBlock } from '../components/CodeBlock';
 import { SourceLink } from '../components/SourceLink';
 import { LogTable } from '../components/LogTable';
 import { LogModal } from '../components/LogModal';
+import { RequestTraceModal } from '../components/RequestTraceModal';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { defaultElasticSettings, prometheusAlertPrompt, aiAnalysisPrompt } from '../../config/application';
@@ -43,6 +44,8 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('recent');
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string>('');
+  const [isRequestTraceModalOpen, setIsRequestTraceModalOpen] = useState(false);
   const [elasticSettings, setElasticSettings] = useState<ElasticSettings>(defaultElasticSettings);
   const [showElasticSettings, setShowElasticSettings] = useState(false);
   const [aiPromptSettings, setAIPromptSettings] = useState<AIPromptSettings>({
@@ -107,6 +110,16 @@ export const App: React.FC = () => {
   const handleCloseLogModal = () => {
     setIsLogModalOpen(false);
     setSelectedLog(null);
+  };
+
+  const handleRequestTrace = (requestId: string) => {
+    setSelectedRequestId(requestId);
+    setIsRequestTraceModalOpen(true);
+  };
+
+  const handleCloseRequestTraceModal = () => {
+    setIsRequestTraceModalOpen(false);
+    setSelectedRequestId('');
   };
 
   return (
@@ -394,7 +407,13 @@ export const App: React.FC = () => {
                     <button className="tab" role="tab" aria-selected={activeTab === 'slow'} aria-controls="slow-panel" id="slow-tab" onClick={() => setActiveTab('slow')}>Slow ({result.lastSlowRequestLogs?.length || 0})</button>
                   </div>
                   <div role="tabpanel" id={`${activeTab}-panel`} aria-labelledby={`${activeTab}-tab`}>
-                    <LogTable logs={currentLogs} emptyText="No logs" ariaLabel={`${activeTab} logs`} onLogClick={handleLogClick} />
+                    <LogTable 
+                      logs={currentLogs} 
+                      emptyText="No logs" 
+                      ariaLabel={`${activeTab} logs`} 
+                      onLogClick={handleLogClick}
+                      onRequestTrace={handleRequestTrace}
+                    />
                   </div>
                 </div>
               )}
@@ -413,6 +432,12 @@ export const App: React.FC = () => {
         log={selectedLog}
         isOpen={isLogModalOpen}
         onClose={handleCloseLogModal}
+      />
+      
+      <RequestTraceModal
+        requestId={selectedRequestId}
+        isOpen={isRequestTraceModalOpen}
+        onClose={handleCloseRequestTraceModal}
       />
     </div>
   );

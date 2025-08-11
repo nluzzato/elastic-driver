@@ -34,9 +34,9 @@ export class ElasticsearchService {
   }
 
   /**
-   * Get the last 100 logs for a specific pod
+   * Get the last logs for a specific pod within a timeframe
    */
-  async getLastLogsForPod(podName: string, limit: number = 100, logLevel?: string, messageFilter?: string): Promise<LogEntry[]> {
+  async getLastLogsForPod(podName: string, limit: number = 100, logLevel?: string, messageFilter?: string, timeframeMinutes?: number): Promise<LogEntry[]> {
     if (!this.enabled) {
       console.warn('⚠️  Elasticsearch not available - cannot fetch logs');
       return [];
@@ -45,7 +45,8 @@ export class ElasticsearchService {
     try {
       const levelFilter = logLevel ? ` (${logLevel} level)` : '';
       const msgFilter = messageFilter ? ` (containing "${messageFilter}")` : '';
-      console.log(`🔍 Fetching last ${limit}${levelFilter}${msgFilter} logs for pod: ${podName}`);
+      const timeFilter = timeframeMinutes ? ` (last ${timeframeMinutes}min)` : '';
+      console.log(`🔍 Fetching last ${limit}${levelFilter}${msgFilter}${timeFilter} logs for pod: ${podName}`);
 
       const mustFilters: any[] = [
         {
@@ -66,6 +67,18 @@ export class ElasticsearchService {
           }
         }
       ];
+
+      // Add timeframe filter if specified
+      if (timeframeMinutes) {
+        const startTime = new Date(Date.now() - timeframeMinutes * 60 * 1000);
+        mustFilters.push({
+          range: {
+            '@timestamp': {
+              gte: startTime.toISOString()
+            }
+          }
+        });
+      }
 
       // Add log level filter if specified
       if (logLevel) {
@@ -182,53 +195,68 @@ export class ElasticsearchService {
   }
 
   /**
-   * Get the last logs with slow request times (json.extra.request_time > threshold)
+   * Get the last logs with slow request times (json.extra.request_time > threshold) within a timeframe
    */
-  async getLastSlowRequestLogsForPod(podName: string, limit: number = 100, thresholdSeconds: number = 1): Promise<LogEntry[]> {
+  async getLastSlowRequestLogsForPod(podName: string, limit: number = 100, thresholdSeconds: number = 1, timeframeMinutes?: number): Promise<LogEntry[]> {
     if (!this.enabled) {
       return [];
     }
 
     try {
-      console.log(`🔍 Fetching last ${limit} slow request logs (>${thresholdSeconds}s) for pod: ${podName}`);
+      const timeFilter = timeframeMinutes ? ` (last ${timeframeMinutes}min)` : '';
+      console.log(`🔍 Fetching last ${limit} slow request logs (>${thresholdSeconds}s)${timeFilter} for pod: ${podName}`);
+
+      const mustFilters: any[] = [
+        // Pod name filter (exact match)
+        {
+          bool: {
+            should: [
+              {
+                term: {
+                  'json.hostname.keyword': podName
+                }
+              },
+              {
+                term: {
+                  'json.hostname': podName
+                }
+              }
+            ],
+            minimum_should_match: 1
+          }
+        },
+        // Request time filter (greater than threshold)
+        {
+          range: {
+            'json.extra.request_time': {
+              gt: thresholdSeconds
+            }
+          }
+        },
+        // Make sure json.extra.request_time field exists
+        {
+          exists: {
+            field: 'json.extra.request_time'
+          }
+        }
+      ];
+
+      // Add timeframe filter if specified
+      if (timeframeMinutes) {
+        const startTime = new Date(Date.now() - timeframeMinutes * 60 * 1000);
+        mustFilters.push({
+          range: {
+            '@timestamp': {
+              gte: startTime.toISOString()
+            }
+          }
+        });
+      }
 
       const searchQuery = {
         query: {
           bool: {
-            must: [
-              // Pod name filter (exact match)
-              {
-                bool: {
-                  should: [
-                    {
-                      term: {
-                        'json.hostname.keyword': podName
-                      }
-                    },
-                    {
-                      term: {
-                        'json.hostname': podName
-                      }
-                    }
-                  ],
-                  minimum_should_match: 1
-                }
-              },
-              // Request time filter (greater than threshold)
-              {
-                range: {
-                  'json.extra.request_time': {
-                    gt: thresholdSeconds
-                  }
-                }
-              },
-              // Make sure json.extra.request_time field exists
-              {
-                exists: {
-                  field: 'json.extra.request_time'
-                }
-              }
-            ]
+            must: mustFilters
           }
         },
         sort: [

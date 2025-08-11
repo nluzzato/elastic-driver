@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 
-type Log = { timestamp: string; level?: string; message: string };
+type Log = { timestamp: string; level?: string; message: string; requestId?: string };
 
 // Simple virtualized list without external deps
 export const LogTable: React.FC<{ 
@@ -8,8 +8,9 @@ export const LogTable: React.FC<{
   emptyText: string; 
   ariaLabel?: string;
   onLogClick?: (log: Log) => void;
+  onRequestTrace?: (requestId: string) => void;
 }>
-  = ({ logs, emptyText, ariaLabel, onLogClick }) => {
+  = ({ logs, emptyText, ariaLabel, onLogClick, onRequestTrace }) => {
   const rowHeight = 32;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -90,6 +91,31 @@ export const LogTable: React.FC<{
                 textOverflow: 'ellipsis',
                 minWidth: 0
               }}>{log.message}</span>
+              {log.requestId && onRequestTrace && (
+                <button
+                  className="request-trace-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRequestTrace(log.requestId!);
+                  }}
+                  title={`Trace request: ${log.requestId}`}
+                  style={{
+                    flexShrink: 0,
+                    background: 'none',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '2px 6px',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    opacity: 0.7,
+                    transition: 'opacity 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                >
+                  🔍
+                </button>
+              )}
             </div>
           );
         })}

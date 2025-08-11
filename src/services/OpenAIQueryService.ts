@@ -283,7 +283,7 @@ Provide a clear assessment and actionable recommendations. Format your response 
           }
         ],
         max_completion_tokens: 3000,
-        temperature: 0.3,
+        // Note: o3-mini doesn't support temperature parameter
       });
 
       const debugPrompt = completion.choices[0]?.message?.content?.trim();
