@@ -1,3 +1,4 @@
+import type { GrafanaMetricData } from '../services/GrafanaService';
 // Type definitions for the Alert Context Agent
 
 export interface AlertDetails {
@@ -129,6 +130,8 @@ export interface ContextOutput {
   lastSlowRequestLogs?: ElasticLogEntry[];
   alertExpressionExplanation?: string;
   analysisText?: string;
+  // Backward-compatibility for legacy CLI/demo printing
+  formattedContext?: string;
 }
 
 // Simple types only - no complex pipeline types
@@ -166,4 +169,18 @@ export interface ElasticLogEntry {
   environment?: string;
   applicationName?: string;
   [key: string]: any;
+}
+
+// Shared config types for API and services
+export interface ElasticSettings {
+  timeframeMinutes: number;
+  documentLimit: number;
+  slowRequestThreshold: number;
+}
+
+export interface LogTypes {
+  general: boolean;
+  error: boolean;
+  slow: boolean;
+  timeDebugger: boolean;
 }

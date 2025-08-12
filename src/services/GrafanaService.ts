@@ -1,4 +1,5 @@
 import { Config } from '../types';
+import { httpFetch } from '@/utils';
 
 export interface MetricValue {
   timestamp: number;
@@ -63,7 +64,7 @@ export class GrafanaService {
       console.log(`🔍 Querying Grafana metric: ${query}`);
 
       const url = `${this.config!.url}/api/datasources/proxy/${datasourceId}/api/v1/query`;
-      const response = await fetch(url, {
+      const response = await httpFetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.config!.apiKey}`,
@@ -72,7 +73,8 @@ export class GrafanaService {
         body: new URLSearchParams({
           query: query,
           time: Math.floor(Date.now() / 1000).toString()
-        })
+        }),
+        timeoutMs: this.config!.timeout,
       });
 
       if (!response.ok) {
@@ -107,7 +109,7 @@ export class GrafanaService {
       console.log(`🔍 Querying Grafana range data: ${query}`);
 
       const url = `${this.config!.url}/api/datasources/proxy/${datasourceId}/api/v1/query_range`;
-      const response = await fetch(url, {
+      const response = await httpFetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.config!.apiKey}`,
@@ -118,7 +120,8 @@ export class GrafanaService {
           start: Math.floor(startTime.getTime() / 1000).toString(),
           end: Math.floor(endTime.getTime() / 1000).toString(),
           step: step
-        })
+        }),
+        timeoutMs: this.config!.timeout,
       });
 
       if (!response.ok) {
@@ -298,21 +301,18 @@ export class GrafanaService {
     }
 
     try {
-      // For now, just test if we can reach the base URL
-      const response = await fetch(`${this.config!.url}/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.config!.apiKey}`,
+      const headers = { 'Authorization': `Bearer ${this.config!.apiKey}` };
+      const endpoints = ['/api/health', '/api/search', '/api/datasources'];
+      for (const ep of endpoints) {
+        const resp = await httpFetch(`${this.config!.url}${ep}`, { headers, timeoutMs: 5000 });
+        if (resp.ok) {
+          console.log(`✅ Grafana health check passed via ${ep}`);
+          return true;
         }
-      });
-
-      if (response.ok) {
-        console.log('✅ Grafana base URL reachable');
-        return true;
-      } else {
-        console.log(`⚠️  Grafana returned ${response.status} - needs API endpoint configuration`);
-        return false;
+        console.warn(`⚠️  Grafana health probe ${ep} returned ${resp.status}`);
       }
+      console.error('❌ Grafana health check failed: all probes unsuccessful');
+      return false;
 
     } catch (error) {
       console.error('❌ Grafana connectivity failed:', error);

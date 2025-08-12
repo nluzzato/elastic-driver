@@ -97,23 +97,45 @@ export class SimpleAlertService {
           timeDebuggerLogs = []; // Not needed for reset investigation
           slowRequestLogs = []; // Not needed for reset investigation
         } else {
-          // Standard log fetching for other presets
+          // Standard log fetching for other presets (honor logTypes)
           const limit = elasticSettings?.documentLimit || 100;
           const slowThreshold = elasticSettings?.slowRequestThreshold || 1;
           const timeframeMinutes = elasticSettings?.timeframeMinutes;
-          
+
           console.log(`📊 Using Elasticsearch settings: ${limit} docs, ${slowThreshold}s slow threshold, ${timeframeMinutes || 'no'} timeframe`);
-          
-          // Fetch general logs, error logs, TIME_DEBUGGER logs, and slow request logs in parallel
-          [logs, errorLogs, timeDebuggerLogs, slowRequestLogs] = await Promise.all([
-            this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, undefined, timeframeMinutes),
-            this.elasticsearchService.getLastLogsForPod(podName, limit, 'ERROR', undefined, timeframeMinutes),
-            this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, '[TIME_DEBUGGER] [SLOW]', timeframeMinutes),
-            this.elasticsearchService.getLastSlowRequestLogsForPod(podName, limit, slowThreshold, timeframeMinutes)
-          ]);
+
+          const logPromises: Array<{ type: 'general'|'error'|'timeDebugger'|'slow'; promise: Promise<LogEntry[]> }> = [];
+          if (!logTypes || logTypes.general) {
+            logPromises.push({ type: 'general', promise: this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, undefined, timeframeMinutes) });
+          }
+          if (!logTypes || logTypes.error) {
+            logPromises.push({ type: 'error', promise: this.elasticsearchService.getLastLogsForPod(podName, limit, 'ERROR', undefined, timeframeMinutes) });
+          }
+          if (!logTypes || logTypes.timeDebugger) {
+            logPromises.push({ type: 'timeDebugger', promise: this.elasticsearchService.getLastLogsForPod(podName, limit, undefined, '[TIME_DEBUGGER] [SLOW]', timeframeMinutes) });
+          }
+          if (!logTypes || logTypes.slow) {
+            logPromises.push({ type: 'slow', promise: this.elasticsearchService.getLastSlowRequestLogsForPod(podName, limit, slowThreshold, timeframeMinutes) });
+          }
+
+          const results = await Promise.all(logPromises.map(p => p.promise));
+          const logResults: Record<'general'|'error'|'timeDebugger'|'slow', LogEntry[]> = {
+            general: [],
+            error: [],
+            timeDebugger: [],
+            slow: []
+          };
+          logPromises.forEach((item, index) => {
+            logResults[item.type] = results[index];
+          });
+          logs = logResults.general;
+          errorLogs = logResults.error;
+          timeDebuggerLogs = logResults.timeDebugger;
+          slowRequestLogs = logResults.slow;
         }
       } catch (error) {
-        console.warn('⚠️  Failed to fetch logs from Elasticsearch:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.warn('⚠️  Failed to fetch logs from Elasticsearch:', message);
       }
     }
     

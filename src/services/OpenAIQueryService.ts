@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { Config } from '../types';
-import { prometheusAlertPrompt, aiAnalysisPrompt, contextualDebugPrompt } from '../config/application';
+import { prometheusAlertPrompt, aiAnalysisPrompt, contextualDebugPrompt, defaultAiSettings } from '../config/application';
 
 /**
  * OpenAI Query Service - Explains Prometheus queries in human language
@@ -35,7 +35,7 @@ export class OpenAIQueryService {
       const prompt = this.buildPrompt(query, alertName, alertContext);
       
       const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini', // Using the faster, cheaper model
+        model: defaultAiSettings.model.explanation,
         messages: [
           {
             role: 'system',
@@ -47,7 +47,7 @@ export class OpenAIQueryService {
           }
         ],
         max_tokens: 300,
-        temperature: 0.3, // Lower temperature for more consistent, factual responses
+        temperature: defaultAiSettings.temperature,
       });
 
       const explanation = completion.choices[0]?.message?.content?.trim();
@@ -101,7 +101,7 @@ export class OpenAIQueryService {
     try {
       // Simple test query
       const testCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: defaultAiSettings.model.explanation,
         messages: [
           {
             role: 'user',
@@ -205,7 +205,7 @@ Provide a clear assessment and actionable recommendations. Format your response 
 - Clear, structured analysis that's easy to scan`;
 
       const completion = await this.openai.chat.completions.create({
-        model: 'o3-mini',
+        model: defaultAiSettings.model.analysis,
         messages: [
           {
             role: 'system',
@@ -216,7 +216,7 @@ Provide a clear assessment and actionable recommendations. Format your response 
             content: prompt
           }
         ],
-        max_completion_tokens: 2500,
+        max_completion_tokens: defaultAiSettings.maxTokens,
       });
 
       const analysis = completion.choices[0]?.message?.content?.trim();
@@ -271,7 +271,7 @@ Provide a clear assessment and actionable recommendations. Format your response 
       });
 
       const completion = await this.openai.chat.completions.create({
-        model: 'o3-mini', // Using reasoning model for complex analysis
+        model: defaultAiSettings.model.contextual, // Using reasoning model for complex analysis
         messages: [
           {
             role: 'system',
@@ -282,7 +282,7 @@ Provide a clear assessment and actionable recommendations. Format your response 
             content: userPrompt
           }
         ],
-        max_completion_tokens: 3000,
+        max_completion_tokens: defaultAiSettings.maxTokens,
         // Note: o3-mini doesn't support temperature parameter
       });
 

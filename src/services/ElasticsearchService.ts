@@ -1,4 +1,5 @@
 import { Config } from '../types';
+import { httpFetch } from '@/utils';
 
 export interface LogEntry {
   timestamp: string;
@@ -142,10 +143,11 @@ export class ElasticsearchService {
         headers['Authorization'] = `ApiKey ${this.config.apiKey}`;
       }
 
-      const httpResponse = await fetch(searchUrl, {
+      const httpResponse = await httpFetch(searchUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify(searchBody)
+        body: searchBody,
+        timeoutMs: this.config.timeout,
       });
 
       if (!httpResponse.ok) {
@@ -286,13 +288,11 @@ export class ElasticsearchService {
 
       console.log('📡 Elasticsearch query:', JSON.stringify(searchQuery, null, 2));
 
-      const response = await fetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
+      const response = await httpFetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}`
-        },
-        body: JSON.stringify(searchQuery)
+        headers: this.buildAuthHeaders(),
+        body: searchQuery,
+        timeoutMs: this.config.timeout,
       });
 
       if (!response.ok) {
@@ -402,16 +402,11 @@ export class ElasticsearchService {
         _source: ['@timestamp', 'json.message', 'json.hostname']
       };
 
-      const response = await fetch(`${this.config.url}/_search`, {
+      const response = await httpFetch(`${this.config.url}/_search`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.config.apiKey && { 'Authorization': `ApiKey ${this.config.apiKey}` }),
-          ...(this.config.username && this.config.password && { 
-            'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}` 
-          })
-        },
-        body: JSON.stringify(searchQuery)
+        headers: this.buildAuthHeaders(),
+        body: searchQuery,
+        timeoutMs: this.config.timeout,
       });
 
       if (!response.ok) {
@@ -492,16 +487,11 @@ export class ElasticsearchService {
         _source: ['@timestamp', 'json.levelname', 'json.message', 'json.hostname', 'json.service_name', 'json.module', 'json.request_id']
       };
 
-      const response = await fetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
+      const response = await httpFetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.config.apiKey && { 'Authorization': `ApiKey ${this.config.apiKey}` }),
-          ...(this.config.username && this.config.password && { 
-            'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}` 
-          })
-        },
-        body: JSON.stringify(searchQuery)
+        headers: this.buildAuthHeaders(),
+        body: searchQuery,
+        timeoutMs: this.config.timeout,
       });
 
       if (!response.ok) {
@@ -732,13 +722,14 @@ export class ElasticsearchService {
         headers['Authorization'] = `ApiKey ${this.config.apiKey}`;
       }
 
-      const response = await fetch(healthUrl, {
+      const response = await httpFetch(healthUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
+        body: {
           query: { match_all: {} },
-          size: 0 // Just test connectivity, don't return data
-        })
+          size: 0
+        },
+        timeoutMs: this.config.timeout,
       });
 
       if (response.ok) {
@@ -759,5 +750,15 @@ export class ElasticsearchService {
    */
   isEnabled(): boolean {
     return this.enabled;
+  }
+
+  private buildAuthHeaders(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      ...(this.config.apiKey && { 'Authorization': `ApiKey ${this.config.apiKey}` }),
+      ...(this.config.username && this.config.password && {
+        'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}`
+      })
+    };
   }
 }

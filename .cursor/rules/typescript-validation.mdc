@@ -1,0 +1,49 @@
+---
+alwaysApply: true
+---
+
+# TypeScript Compilation Requirements
+
+**CRITICAL RULE: All TypeScript code MUST compile without errors before any commit or deployment.**
+
+## Validation Requirements
+- All TypeScript files must pass `tsc --noEmit` without any errors
+- No `any` types without explicit typing
+- All imports and exports must be properly typed
+- Strict TypeScript configuration must be maintained
+
+## Common TypeScript Issues to Avoid
+1. **Property Access Errors**: Check that properties exist on types before accessing
+2. **Implicit Any Types**: Always explicitly type function parameters and variables
+3. **Missing Imports**: Ensure all dependencies are properly imported
+4. **Type Mismatches**: Verify type compatibility between assignments and function calls
+5. **Enum Usage**: Declare enums before using them in other declarations
+
+## Before Making Changes
+1. Always run TypeScript compilation check
+2. Fix any type errors immediately
+3. Use proper type assertions with `instanceof` checks
+4. Prefer type-safe operations over `any` casting
+
+## Authentication Headers Pattern
+For Elasticsearch service auth headers, use:
+```typescript
+headers: {
+  'Content-Type': 'application/json',
+  ...(this.config.apiKey && { 'Authorization': `ApiKey ${this.config.apiKey}` }),
+  ...(this.config.username && this.config.password && { 
+    'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}` 
+  })
+}
+```
+
+## Error Handling Pattern
+For catch blocks, always type check errors:
+```typescript
+catch (error) {
+  const message = error instanceof Error ? error.message : 'Unknown error';
+  console.error('Error:', message);
+}
+```
+
+**NO EXCEPTIONS: TypeScript compilation MUST pass before any code changes are considered complete.**
