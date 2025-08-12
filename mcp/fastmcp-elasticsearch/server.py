@@ -432,6 +432,7 @@ def fetch_user_logs(
     slow_request_threshold: float = 2.0,
     limit: int = 100,
     environment: Optional[str] = None,
+    start_time: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Fetch user-specific logs from app-logs* including errors and slow requests.
@@ -450,6 +451,7 @@ def fetch_user_logs(
         slow_request_threshold: Request time threshold in seconds (default 2.0)
         limit: Max results per search type (1-1000, default 100)
         environment: Target environment (defaults to current)
+        start_time: Optional start time in ISO format (e.g., '2025-06-23T00:00:00Z'). If not provided, uses current time minus timeframe_minutes.
         
     Returns:
         Dictionary with error_logs, slow_requests, and summary
@@ -464,8 +466,18 @@ def fetch_user_logs(
     slow_request_threshold = max(0.1, slow_request_threshold)
     
     # Calculate time range
-    end_time = datetime.now(timezone.utc)
-    start_time = end_time - timedelta(minutes=timeframe_minutes)
+    if start_time:
+        try:
+            # Parse the provided start time
+            start_time_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            end_time = start_time_dt + timedelta(minutes=timeframe_minutes)
+        except (ValueError, TypeError) as e:
+            # Fall back to current time if parsing fails
+            end_time = datetime.now(timezone.utc)
+            start_time_dt = end_time - timedelta(minutes=timeframe_minutes)
+    else:
+        end_time = datetime.now(timezone.utc)
+        start_time_dt = end_time - timedelta(minutes=timeframe_minutes)
     
     # Build base query for user identification
     user_query = {
@@ -482,7 +494,7 @@ def fetch_user_logs(
     time_filter = {
         "range": {
             "@timestamp": {
-                "gte": start_time.isoformat(),
+                "gte": start_time_dt.isoformat(),
                 "lte": end_time.isoformat()
             }
         }
@@ -591,7 +603,7 @@ def fetch_user_logs(
         "user_id": user_id,
         "timeframe_minutes": timeframe_minutes,
         "search_period": {
-            "start": start_time.isoformat(),
+            "start": start_time_dt.isoformat(),
             "end": end_time.isoformat()
         },
         "total_errors": len(formatted_errors),
