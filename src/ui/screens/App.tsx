@@ -384,7 +384,7 @@ export const App: React.FC = () => {
               )}
             </div>
 
-            <SectionCard title="Result">
+            <SectionCard title="Alert info">
               {!result && !loading && <div className="muted">Run a query to see results.</div>}
               {loading && (
                 <>
