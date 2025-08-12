@@ -2,6 +2,7 @@
 Bugsnag (Insight Hub) API client for fetching error data.
 """
 import httpx
+import json
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone, timedelta
 from config.bugsnag import get_bugsnag_config, get_auth_headers, validate_bugsnag_config
@@ -112,7 +113,7 @@ class BugsnagClient:
             filters['before'] = [{"eq": end_time}]
         
         if filters:
-            params['filters'] = filters
+            params['filters'] = json.dumps(filters)
         
         response = await self._make_request("GET", endpoint, params)
         
