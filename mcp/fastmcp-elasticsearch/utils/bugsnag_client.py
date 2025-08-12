@@ -100,16 +100,12 @@ class BugsnagClient:
         }
         
         # Add time filters
-        filters = []
         if start_time:
-            filters.append(f"event.since:{start_time}")
+            params['since'] = start_time
         if end_time:
-            filters.append(f"event.before:{end_time}")
+            params['before'] = end_time
         if user_id:
-            filters.append(f"user.id:{user_id}")
-        
-        if filters:
-            params['filters'] = ' '.join(filters)
+            params['user.id'] = user_id
         
         return await self._make_request("GET", endpoint, params)
     
