@@ -238,7 +238,19 @@ def test_bugsnag_connection() -> Dict[str, Any]:
         
         # Try to fetch projects as a connectivity test
         import asyncio
-        projects = asyncio.run(client.get_projects())
+        import concurrent.futures
+        
+        # Handle event loop properly
+        try:
+            # Try to get current event loop
+            loop = asyncio.get_running_loop()
+            # If we're in an event loop, use executor
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, client.get_projects())
+                projects = future.result(timeout=30)
+        except RuntimeError:
+            # No event loop running, safe to use asyncio.run
+            projects = asyncio.run(client.get_projects())
         
         return {
             "status": "success",
