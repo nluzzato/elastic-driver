@@ -395,10 +395,6 @@ export const App: React.FC = () => {
               {result && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                   <div>
-                    <div className="row" style={{ gap: 8, marginBottom: 8 }}>
-                      <StatPill label="Status" value={result.status} tone={result.status === 'FIRING' ? 'danger' : 'success'} />
-                      <StatPill label="Found" value={String(result.found)} tone={result.found ? 'success' : 'warning'} />
-                    </div>
                     <KeyValueGrid
                       items={[
                         ['Alert name', result.alertname],
