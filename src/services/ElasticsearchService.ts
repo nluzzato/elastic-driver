@@ -1,5 +1,5 @@
 import { Config } from '../types';
-import { httpFetch } from '@/utils';
+import { httpFetch } from '../utils/http';
 
 export interface LogEntry {
   timestamp: string;
