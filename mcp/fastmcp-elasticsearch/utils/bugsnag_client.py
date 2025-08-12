@@ -106,10 +106,10 @@ class BugsnagClient:
             filters['user.id'] = [{"eq": user_id}]
         
         if start_time:
-            filters['event.since'] = [{"eq": start_time}]
+            filters['since'] = [{"eq": start_time}]
         
         if end_time:
-            filters['event.before'] = [{"eq": end_time}]
+            filters['before'] = [{"eq": end_time}]
         
         if filters:
             params['filters'] = filters
