@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import '../index.css';
 import { SectionCard } from '../components/SectionCard';
@@ -49,6 +49,7 @@ export const App: React.FC = () => {
   const [selectedPreset, setSelectedPreset] = useState<Preset>(getDefaultPreset());
   const [elasticSettings, setElasticSettings] = useState<ElasticSettings>(defaultElasticSettings);
   const [showElasticSettings, setShowElasticSettings] = useState(false);
+  const [showAlertInfo, setShowAlertInfo] = useState(false);
   const [aiPromptSettings, setAIPromptSettings] = useState<AIPromptSettings>({
     explanationPrompt: prometheusAlertPrompt,
     analysisPrompt: aiAnalysisPrompt
@@ -56,6 +57,13 @@ export const App: React.FC = () => {
   const [showAIPromptSettings, setShowAIPromptSettings] = useState(false);
 
   const canSubmit = useMemo(() => form.pod.trim(), [form]); // Only pod is required
+
+  // Auto-expand alert info when there's meaningful alert data
+  useEffect(() => {
+    if (result && (result.alertname || result.file || result.rule)) {
+      setShowAlertInfo(true);
+    }
+  }, [result]);
 
   async function fetchHealth() {
     setError(null);
@@ -384,39 +392,65 @@ export const App: React.FC = () => {
               )}
             </div>
 
-            <SectionCard title="Alert info">
-              {!result && !loading && <div className="muted">Run a query to see results.</div>}
-              {loading && (
-                <>
-                  <div className="skeleton" style={{ height: 24, marginBottom: 8 }} />
-                  <div className="skeleton" style={{ height: 160 }} />
-                </>
-              )}
-              {result && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                  <div>
-                    <KeyValueGrid
-                      items={[
-                        ['Alert name', result.alertname],
-                        ['File', result.file || '—'],
-                        ['Severity', result.rule?.labels?.severity || '—'],
-                        ['Duration', result.rule?.duration || '—']
-                      ]}
-                    />
-                    <div style={{ marginTop: 8 }}>
-                      <SourceLink href={result.url} />
-                    </div>
+            <div className="elastic-settings-card">
+              <button 
+                className="elastic-settings-header"
+                onClick={() => setShowAlertInfo(!showAlertInfo)}
+                aria-expanded={showAlertInfo}
+                aria-controls="alert-info-panel"
+              >
+                <div className="elastic-settings-title">
+                  <span className="elastic-settings-icon">
+                    🔍
+                  </span>
+                  <span>Alert info</span>
+                  {result && result.alertname && (
+                    <span className="elastic-settings-badge">
+                      {result.alertname}
+                    </span>
+                  )}
+                </div>
+                <span className={`elastic-settings-chevron ${showAlertInfo ? 'expanded' : ''}`}>
+                  ⌄
+                </span>
+              </button>
+              
+              {showAlertInfo && (
+                <div className="elastic-settings-panel" id="alert-info-panel">
+                  {!result && !loading && <div className="muted">Run a query to see results.</div>}
+                  {loading && (
+                    <>
+                      <div className="skeleton" style={{ height: 24, marginBottom: 8 }} />
+                      <div className="skeleton" style={{ height: 160 }} />
+                    </>
+                  )}
+                  {result && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                      <div>
+                        <KeyValueGrid
+                          items={[
+                            ['Alert name', result.alertname],
+                            ['File', result.file || '—'],
+                            ['Severity', result.rule?.labels?.severity || '—'],
+                            ['Duration', result.rule?.duration || '—']
+                          ]}
+                        />
+                        <div style={{ marginTop: 8 }}>
+                          <SourceLink href={result.url} />
+                        </div>
 
-                    {result.alertExpressionExplanation && (
-                      <div style={{ marginTop: 16 }}>
-                        <h4 style={{ margin: 0 }}>AI Explanation</h4>
-                        <ReactMarkdown>{result.alertExpressionExplanation}</ReactMarkdown>
+                        {result.alertExpressionExplanation && (
+                          <div style={{ marginTop: 16 }}>
+                            <h4 style={{ margin: 0 }}>AI Explanation</h4>
+                            <ReactMarkdown>{result.alertExpressionExplanation}</ReactMarkdown>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </SectionCard>
+            </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
             <SectionCard title="Service Health">
