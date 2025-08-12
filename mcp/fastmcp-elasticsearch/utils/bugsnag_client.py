@@ -99,13 +99,20 @@ class BugsnagClient:
             'direction': 'desc'
         }
         
-        # Add time filters
-        if start_time:
-            params['since'] = start_time
-        if end_time:
-            params['before'] = end_time
+        # Add filters object according to Bugsnag API documentation
+        filters = {}
+        
         if user_id:
-            params['user.id'] = user_id
+            filters['user.id'] = [user_id]  # Array of user IDs
+        
+        if start_time:
+            filters['event.since'] = [start_time]  # Array with single timestamp
+        
+        if end_time:
+            filters['event.before'] = [end_time]  # Array with single timestamp
+        
+        if filters:
+            params['filters'] = filters
         
         response = await self._make_request("GET", endpoint, params)
         
