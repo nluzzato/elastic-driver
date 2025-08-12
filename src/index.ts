@@ -88,7 +88,9 @@ async function main(): Promise<void> {
 }
 
 // Export for use as a module
+// Backward-compatibility export: expose SimpleAlertService as AlertService if needed
 export { AlertService } from './services/AlertService';
+export { SimpleAlertService as AlertServiceV2 } from './services/SimpleAlertService';
 export { GitHubService } from './services/GitHubService';
 export * from './types';
 export { config } from './config';

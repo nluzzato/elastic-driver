@@ -1,4 +1,5 @@
 import { Config } from '../types';
+import { httpFetch } from '../utils/http';
 
 export interface LogEntry {
   timestamp: string;
@@ -142,10 +143,11 @@ export class ElasticsearchService {
         headers['Authorization'] = `ApiKey ${this.config.apiKey}`;
       }
 
-      const httpResponse = await fetch(searchUrl, {
+      const httpResponse = await httpFetch(searchUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify(searchBody)
+        body: searchBody,
+        timeoutMs: this.config.timeout,
       });
 
       if (!httpResponse.ok) {
@@ -180,11 +182,13 @@ export class ElasticsearchService {
       console.log(`✅ Found ${logs.length} log entries for pod ${podName}`);
       return logs;
 
-    } catch (error: any) {
-      console.error('❌ Elasticsearch query failed:', error);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Elasticsearch query failed:', message);
       
       // Check if this is a 404 which might mean no results found
-      if (error.meta?.statusCode === 404) {
+      const statusCode = (error as any)?.meta?.statusCode as number | undefined;
+      if (statusCode === 404) {
         console.log('ℹ️  404 response - this might indicate no matching documents were found');
         return [];
       }
@@ -286,13 +290,11 @@ export class ElasticsearchService {
 
       console.log('📡 Elasticsearch query:', JSON.stringify(searchQuery, null, 2));
 
-      const response = await fetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
+      const response = await httpFetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}`
-        },
-        body: JSON.stringify(searchQuery)
+        headers: this.buildAuthHeaders(),
+        body: searchQuery,
+        timeoutMs: this.config.timeout,
       });
 
       if (!response.ok) {
@@ -326,11 +328,13 @@ export class ElasticsearchService {
       console.log(`✅ Found ${logs.length} slow request log entries for pod ${podName}`);
       return logs;
 
-    } catch (error: any) {
-      console.error('❌ Elasticsearch slow request query failed:', error);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Elasticsearch slow request query failed:', message);
       
       // Check if this is a 404 which might mean no results found
-      if (error.meta?.statusCode === 404) {
+      const statusCode = (error as any)?.meta?.statusCode as number | undefined;
+      if (statusCode === 404) {
         console.log('ℹ️  404 response - this might indicate no matching documents were found');
         return [];
       }
@@ -402,16 +406,11 @@ export class ElasticsearchService {
         _source: ['@timestamp', 'json.message', 'json.hostname']
       };
 
-      const response = await fetch(`${this.config.url}/_search`, {
+      const response = await httpFetch(`${this.config.url}/_search`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.config.apiKey && { 'Authorization': `ApiKey ${this.config.apiKey}` }),
-          ...(this.config.username && this.config.password && { 
-            'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}` 
-          })
-        },
-        body: JSON.stringify(searchQuery)
+        headers: this.buildAuthHeaders(),
+        body: searchQuery,
+        timeoutMs: this.config.timeout,
       });
 
       if (!response.ok) {
@@ -444,7 +443,8 @@ export class ElasticsearchService {
       console.log(`✅ Found ${commitLogs.length} valid Git commit entries`);
       return commitLogs;
     } catch (error) {
-      console.error('❌ Error searching Git commit logs:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Error searching Git commit logs:', message);
       return [];
     }
   }
@@ -492,16 +492,11 @@ export class ElasticsearchService {
         _source: ['@timestamp', 'json.levelname', 'json.message', 'json.hostname', 'json.service_name', 'json.module', 'json.request_id']
       };
 
-      const response = await fetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
+      const response = await httpFetch(`${this.config.url}/${this.config.indexPattern}/_search`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.config.apiKey && { 'Authorization': `ApiKey ${this.config.apiKey}` }),
-          ...(this.config.username && this.config.password && { 
-            'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}` 
-          })
-        },
-        body: JSON.stringify(searchQuery)
+        headers: this.buildAuthHeaders(),
+        body: searchQuery,
+        timeoutMs: this.config.timeout,
       });
 
       if (!response.ok) {
@@ -529,7 +524,8 @@ export class ElasticsearchService {
       console.log(`✅ Retrieved ${logs.length} logs since pod initialization`);
       return logs;
     } catch (error) {
-      console.error('❌ Error fetching logs since timestamp:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Error fetching logs since timestamp:', message);
       return [];
     }
   }
@@ -599,8 +595,9 @@ export class ElasticsearchService {
         _index: hit._index
       }));
 
-    } catch (error: any) {
-      console.error('❌ Request trace query failed:', error);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Request trace query failed:', message);
       throw error; // Re-throw for caller to handle
     }
   }
@@ -706,7 +703,8 @@ export class ElasticsearchService {
       return logs;
 
     } catch (error) {
-      console.error('❌ Time-based Elasticsearch query failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Time-based Elasticsearch query failed:', message);
       return [];
     }
   }
@@ -732,13 +730,14 @@ export class ElasticsearchService {
         headers['Authorization'] = `ApiKey ${this.config.apiKey}`;
       }
 
-      const response = await fetch(healthUrl, {
+      const response = await httpFetch(healthUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
+        body: {
           query: { match_all: {} },
-          size: 0 // Just test connectivity, don't return data
-        })
+          size: 0
+        },
+        timeoutMs: this.config.timeout,
       });
 
       if (response.ok) {
@@ -749,7 +748,8 @@ export class ElasticsearchService {
         return false;
       }
     } catch (error) {
-      console.error('❌ Elasticsearch health check failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Elasticsearch health check failed:', message);
       return false;
     }
   }
@@ -759,5 +759,15 @@ export class ElasticsearchService {
    */
   isEnabled(): boolean {
     return this.enabled;
+  }
+
+  private buildAuthHeaders(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      ...(this.config.apiKey && { 'Authorization': `ApiKey ${this.config.apiKey}` }),
+      ...(this.config.username && this.config.password && {
+        'Authorization': `Basic ${Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')}`
+      })
+    };
   }
 }

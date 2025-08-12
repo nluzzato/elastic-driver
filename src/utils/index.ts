@@ -1,4 +1,5 @@
 import { Alert } from '../types';
+export * from './http';
 
 /**
  * Utility functions for the Alert Context Agent
