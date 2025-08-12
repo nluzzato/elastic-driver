@@ -31,23 +31,30 @@ def search_bugsnag_errors(
     try:
         client = BugsnagClient()
         
-        # Run async function in sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Handle event loop properly
+        import concurrent.futures
+        
+        async def _search():
+            return await client.search_errors(
+                project_id=project_id,
+                user_id=user_id,
+                start_time=start_time,
+                end_time=end_time,
+                limit=limit
+            )
         
         try:
-            result = loop.run_until_complete(
-                client.search_errors(
-                    project_id=project_id,
-                    user_id=user_id,
-                    start_time=start_time,
-                    end_time=end_time,
-                    limit=limit
-                )
-            )
-            return result
-        finally:
-            loop.close()
+            # Try to get current event loop
+            loop = asyncio.get_running_loop()
+            # If we're in an event loop, use executor
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, _search())
+                result = future.result(timeout=30)
+        except RuntimeError:
+            # No event loop running, safe to use asyncio.run
+            result = asyncio.run(_search())
+        
+        return result
             
     except Exception as e:
         return {
@@ -70,17 +77,24 @@ def get_bugsnag_error_details(error_id: str) -> Dict[str, Any]:
     try:
         client = BugsnagClient()
         
-        # Run async function in sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Handle event loop properly
+        import concurrent.futures
+        
+        async def _get_details():
+            return await client.get_error_details(error_id)
         
         try:
-            result = loop.run_until_complete(
-                client.get_error_details(error_id)
-            )
-            return result
-        finally:
-            loop.close()
+            # Try to get current event loop
+            loop = asyncio.get_running_loop()
+            # If we're in an event loop, use executor
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, _get_details())
+                result = future.result(timeout=30)
+        except RuntimeError:
+            # No event loop running, safe to use asyncio.run
+            result = asyncio.run(_get_details())
+        
+        return result
             
     except Exception as e:
         return {
@@ -106,17 +120,24 @@ def get_bugsnag_error_events(
     try:
         client = BugsnagClient()
         
-        # Run async function in sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Handle event loop properly
+        import concurrent.futures
+        
+        async def _get_events():
+            return await client.get_error_events(error_id, limit)
         
         try:
-            result = loop.run_until_complete(
-                client.get_error_events(error_id, limit)
-            )
-            return result
-        finally:
-            loop.close()
+            # Try to get current event loop
+            loop = asyncio.get_running_loop()
+            # If we're in an event loop, use executor
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, _get_events())
+                result = future.result(timeout=30)
+        except RuntimeError:
+            # No event loop running, safe to use asyncio.run
+            result = asyncio.run(_get_events())
+        
+        return result
             
     except Exception as e:
         return {
@@ -136,18 +157,27 @@ def get_bugsnag_projects() -> Dict[str, Any]:
     try:
         client = BugsnagClient()
         
-        # Run async function in sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Handle event loop properly
+        import concurrent.futures
+        
+        async def _get_projects():
+            return await client.get_projects()
         
         try:
-            result = loop.run_until_complete(client.get_projects())
-            return {
-                "projects": result,
-                "count": len(result)
-            }
-        finally:
-            loop.close()
+            # Try to get current event loop
+            loop = asyncio.get_running_loop()
+            # If we're in an event loop, use executor
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, _get_projects())
+                result = future.result(timeout=30)
+        except RuntimeError:
+            # No event loop running, safe to use asyncio.run
+            result = asyncio.run(_get_projects())
+        
+        return {
+            "projects": result,
+            "count": len(result)
+        }
             
     except Exception as e:
         return {
