@@ -107,7 +107,12 @@ class BugsnagClient:
         if user_id:
             params['user.id'] = user_id
         
-        return await self._make_request("GET", endpoint, params)
+        response = await self._make_request("GET", endpoint, params)
+        
+        # Handle different response formats
+        if isinstance(response, list):
+            return {"errors": response}
+        return response
     
     async def _search_all_projects(
         self,
