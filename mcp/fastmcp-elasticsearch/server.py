@@ -27,6 +27,7 @@ from tools.primitives import (
     check_index_exists,
 )
 from tools.primitives.bugsnag import bugsnag_health_check
+from tools.flows.bugsnag_user_analysis import fetch_bugsnag_user_logs
 from mcp_types import ElasticResponse, AggregationResponse
 from mcp_types.domain import AppLog
 from utils import (
@@ -676,6 +677,37 @@ def bugsnag_health() -> Dict[str, Any]:
     - Authentication status
     """
     return bugsnag_health_check()
+
+
+@mcp.tool()
+def fetch_user_errors_bugsnag(
+    user_id: int,
+    timeframe_minutes: int = 1440,
+    start_time: Optional[str] = None,
+    limit_per_project: int = 25
+) -> Dict[str, Any]:
+    """
+    Fetch Bugsnag errors for a user across mobile and dashboard projects.
+    
+    This flow tool searches for user-specific errors in:
+    - Mobile app (Connecteam project)
+    - Dashboard (Connecteam-Dashboard project)
+    
+    Args:
+        user_id: User ID to search for
+        timeframe_minutes: Time window in minutes (default: 1440 = 24 hours)
+        start_time: Optional start time in ISO format (e.g., '2025-06-23T00:00:00Z')
+        limit_per_project: Max errors per project (default: 25)
+        
+    Returns:
+        Dictionary containing errors from both mobile and dashboard projects
+    """
+    return fetch_bugsnag_user_logs(
+        user_id=user_id,
+        timeframe_minutes=timeframe_minutes,
+        start_time=start_time,
+        limit_per_project=limit_per_project
+    )
 
 
 if __name__ == "__main__":

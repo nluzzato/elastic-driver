@@ -16,6 +16,7 @@ A standalone MCP server exposing Elasticsearch tools via stdio, fully decoupled 
 ### Flow Tools (Multi-step workflows)
 - `investigate_issues(service_name=None, timeframe_minutes=60, environment=None)`
 - `fetch_user_logs(user_id, timeframe_minutes=60, slow_request_threshold=2.0, limit=100, environment=None, start_time=None)`
+- `fetch_user_errors_bugsnag(user_id, timeframe_minutes=1440, start_time=None, limit_per_project=25)` - Search mobile and dashboard errors
 
 ### Utility Tools
 - `elasticsearch_health()` - Check Elasticsearch connectivity and configuration
