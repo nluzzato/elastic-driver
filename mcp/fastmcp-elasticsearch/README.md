@@ -18,7 +18,8 @@ A standalone MCP server exposing Elasticsearch tools via stdio, fully decoupled 
 - `fetch_user_logs(user_id, timeframe_minutes=60, slow_request_threshold=2.0, limit=100, environment=None, start_time=None)`
 
 ### Utility Tools
-- `health()`
+- `elasticsearch_health()` - Check Elasticsearch connectivity and configuration
+- `bugsnag_health()` - Check Bugsnag API connectivity and available projects
 
 ## Setup
 ```bash

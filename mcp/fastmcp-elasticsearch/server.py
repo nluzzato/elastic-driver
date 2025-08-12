@@ -26,6 +26,7 @@ from tools.primitives import (
     get_elastic_stats,
     check_index_exists,
 )
+from tools.primitives.bugsnag import bugsnag_health_check
 from mcp_types import ElasticResponse, AggregationResponse
 from mcp_types.domain import AppLog
 from utils import (
@@ -640,18 +641,18 @@ def fetch_user_logs(
     }
 
 
-# ========== HEALTH CHECK ==========
+# ========== HEALTH CHECKS ==========
 
 @mcp.tool()
-def health() -> Dict[str, Any]:
+def elasticsearch_health() -> Dict[str, Any]:
     """
-    Check MCP server health and connectivity.
+    Check Elasticsearch connectivity and configuration.
     
-    Returns:
-        Health status
+    Returns status information about:
+    - Elasticsearch connectivity
+    - Environment configuration
+    - Available indices
     """
-    
-    
     env = get_current_environment()
     connected = test_connection()
     
@@ -660,7 +661,21 @@ def health() -> Dict[str, Any]:
         "environment": env,
         "version": "2.0.0",
         "architecture": "layered",
+        "service": "elasticsearch"
     }
+
+
+@mcp.tool()
+def bugsnag_health() -> Dict[str, Any]:
+    """
+    Check Bugsnag API connectivity and configuration.
+    
+    Returns status information about:
+    - Bugsnag API connectivity
+    - Available projects
+    - Authentication status
+    """
+    return bugsnag_health_check()
 
 
 if __name__ == "__main__":
