@@ -715,10 +715,10 @@ Follow these steps in order. After each step, run `npm run build` (TypeScript) a
 - [x] Step 5: SimpleAlertService honors logTypes
 - [x] Step 6: OpenAIQueryService uses centralized model names
 - [x] Step 7: Shared types added and reused in server/service
-- [ ] Step 8: Error handling normalized in touched services
-- [ ] Step 9: `src/index.ts` export cleanup (and README alignment)
+- [x] Step 8: Error handling normalized in touched services
+- [x] Step 9: `src/index.ts` export cleanup (and README alignment)
 - [x] Step 10: TypeScript build green
-- [ ] Step 11: Commit Phase 1
+- [x] Step 11: Commit Phase 1
 
 ### Phase 2 - Architecture Enhancement
 - `src/services/interfaces.ts`: NEW - Service interface definitions
