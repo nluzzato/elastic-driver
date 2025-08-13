@@ -4,7 +4,6 @@ Bugsnag (Insight Hub) API client for fetching error data.
 import httpx
 import json
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone, timedelta
 from config.bugsnag import get_bugsnag_config, get_auth_headers, validate_bugsnag_config
 
 
@@ -52,7 +51,16 @@ class BugsnagClient:
             List of project data
         """
         endpoint = f"/organizations/{self.config['org_id']}/projects"
-        return await self._make_request("GET", endpoint)
+        response = await self._make_request("GET", endpoint)
+        
+        # The API might return projects under a 'projects' key or as a direct list
+        if isinstance(response, list):
+            return response
+        elif isinstance(response, dict) and 'projects' in response:
+            return response['projects']
+        else:
+            # If unexpected format, return empty list
+            return []
     
     async def search_errors(
         self,
@@ -100,15 +108,16 @@ class BugsnagClient:
             'direction': 'desc'
         }
         
-        # Add direct query parameters (not filters object)
+        # Use the GUI filter format: filters[field_name]=value
+        # This is what the actual Bugsnag web interface uses
         if user_id:
-            params['user.id'] = user_id
+            params['filters[user.id]'] = user_id
         
         if start_time:
-            params['since'] = start_time
+            params['filters[event.since]'] = start_time
         
         if end_time:
-            params['before'] = end_time
+            params['filters[event.before]'] = end_time
         
         response = await self._make_request("GET", endpoint, params)
         
@@ -245,16 +254,24 @@ def test_bugsnag_connection() -> Dict[str, Any]:
         import concurrent.futures
         
         # Handle event loop properly
+        projects: List[Dict[str, Any]] = []
         try:
             # Try to get current event loop
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # If we're in an event loop, use executor
+            
+            async def _get_projects():
+                return await client.get_projects()
+            
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, client.get_projects())
+                future = executor.submit(asyncio.run, _get_projects())
                 projects = future.result(timeout=30)
         except RuntimeError:
             # No event loop running, safe to use asyncio.run
-            projects = asyncio.run(client.get_projects())
+            async def _get_projects():
+                return await client.get_projects()
+            
+            projects = asyncio.run(_get_projects())
         
         return {
             "status": "success",

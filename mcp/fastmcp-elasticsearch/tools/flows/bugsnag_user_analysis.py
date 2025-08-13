@@ -81,11 +81,15 @@ def fetch_bugsnag_user_logs(
         for project_key, project_info in projects.items():
             try:
                 # Search for errors in this specific project
+                # Convert timestamps to Z format (Bugsnag API requirement)
+                start_time_str = start_time_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+                end_time_str = end_time_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+                
                 project_result = search_bugsnag_errors(
                     project_id=project_info['id'],
                     user_id=str(user_id),
-                    start_time=start_time_dt.isoformat(),
-                    end_time=end_time_dt.isoformat(),
+                    start_time=start_time_str,
+                    end_time=end_time_str,
                     limit=limit_per_project
                 )
                 

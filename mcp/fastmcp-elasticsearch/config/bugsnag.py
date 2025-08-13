@@ -54,5 +54,7 @@ def get_auth_headers() -> dict:
     config = get_bugsnag_config()
     return {
         'Authorization': f'token {config["api_token"]}',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-version': '2',
+        'accept': 'application/json'
     }

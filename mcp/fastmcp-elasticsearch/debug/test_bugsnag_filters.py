@@ -9,7 +9,6 @@ import asyncio
 import json
 import sys
 import os
-from urllib.parse import urlencode, unquote_plus
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,7 +17,7 @@ from utils.bugsnag_client import BugsnagClient
 from config.bugsnag import get_bugsnag_config, validate_bugsnag_config
 from debug.utils.test_helpers import (
     print_header, print_test, print_success, print_error, print_info, print_json,
-    decode_url_filters, create_test_timeframe, safe_call, exit_with_summary
+    decode_url_filters, create_test_timeframe, exit_with_summary
 )
 
 
@@ -58,7 +57,7 @@ class BugsnagFilterTester:
         """Test basic API connectivity without filters."""
         print_test("Basic Connectivity (No Filters)")
         
-        success, result = await safe_call(self.client.get_projects)
+        success, result = await safe_call_async(self.client.get_projects)
         
         if success:
             projects = result
@@ -76,7 +75,7 @@ class BugsnagFilterTester:
         """Test searching errors without any filters."""
         print_test("Error Search (No Filters)")
         
-        success, result = await safe_call(
+        success, result = await safe_call_async(
             self.client.search_errors,
             project_id=self.mobile_project_id,
             limit=5
@@ -103,7 +102,7 @@ class BugsnagFilterTester:
         json_filters = json.dumps(filters)
         print_info(f"Filter object: {json_filters}")
         
-        success, result = await safe_call(
+        success, result = await safe_call_async(
             self.client.search_errors,
             project_id=self.mobile_project_id,
             user_id=self.test_user_id,
@@ -137,7 +136,7 @@ class BugsnagFilterTester:
         json_filters = json.dumps(filters)
         print_info(f"Filter object: {json_filters}")
         
-        success, result = await safe_call(
+        success, result = await safe_call_async(
             self.client.search_errors,
             project_id=self.mobile_project_id,
             start_time=start_time,
@@ -172,7 +171,7 @@ class BugsnagFilterTester:
         json_filters = json.dumps(filters)
         print_info(f"Filter object: {json_filters}")
         
-        success, result = await safe_call(
+        success, result = await safe_call_async(
             self.client.search_errors,
             project_id=self.mobile_project_id,
             user_id=self.test_user_id,
@@ -273,7 +272,7 @@ class BugsnagFilterTester:
         exit_with_summary(self.passed, self.failed)
 
 
-async def safe_call(func, *args, **kwargs):
+async def safe_call_async(func, *args, **kwargs):
     """Safely call an async function."""
     try:
         if asyncio.iscoroutinefunction(func):
