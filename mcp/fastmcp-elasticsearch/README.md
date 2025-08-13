@@ -4,23 +4,17 @@ A standalone MCP server exposing Elasticsearch tools via stdio, fully decoupled 
 
 ## Tools
 
-### Primitive Tools (Low-level Elasticsearch access)
-- `search_logs_primitive(index_pattern, query, size=100, from_offset=0, sort=None, fields=None)`
-- `aggregate_data_primitive(index_pattern, query, aggregations)`
-- `get_index_stats_primitive(index_pattern)`
+This MCP server provides 4 essential tools for observability and user analysis:
 
-### Wrapper Tools (Domain-specific convenience)
-- `search_app_logs(pod_name=None, service_name=None, level=None, message_filter=None, timeframe_minutes=60, limit=100, environment=None)`
-- `list_active_pods(timeframe_minutes=60, environment=None)`
+### Health Check
+- `health()` - Check connectivity and configuration for all services (Elasticsearch + Bugsnag)
 
-### Flow Tools (Multi-step workflows)
-- `investigate_issues(service_name=None, timeframe_minutes=60, environment=None)`
-- `fetch_user_logs(user_id, timeframe_minutes=60, slow_request_threshold=2.0, limit=100, environment=None, start_time=None)`
-- `fetch_user_errors_bugsnag(user_id, timeframe_minutes=1440, start_time=None, limit_per_project=25)` - Search mobile and dashboard errors
+### Raw Elasticsearch Access  
+- `search_elastic_logs_primitive(index_pattern, query, size=100, from_offset=0, sort=None, fields=None)` - Low-level Elasticsearch Query DSL search
 
-### Utility Tools
-- `elasticsearch_health()` - Check Elasticsearch connectivity and configuration
-- `bugsnag_health()` - Check Bugsnag API connectivity and available projects
+### User Analysis Workflows
+- `fetch_elastic_user_logs(user_id, timeframe_minutes=60, slow_request_threshold=2.0, limit=100, environment=None, start_time=None)` - User-specific Elasticsearch analysis (errors, slow requests, activity)
+- `fetch_user_errors_bugsnag(user_id, timeframe_minutes=1440, start_time=None, limit_per_project=25)` - User-specific Bugsnag errors from mobile and dashboard projects
 
 ## Setup
 ```bash
