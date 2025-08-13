@@ -37,10 +37,10 @@ class BugsnagFilterTester:
         
         try:
             config = get_bugsnag_config()
-            validation = validate_bugsnag_config()
+            is_valid = validate_bugsnag_config()
             
-            if not validation['valid']:
-                print_error(f"Invalid config: {validation['message']}")
+            if not is_valid:
+                print_error("Invalid Bugsnag configuration - check environment variables")
                 return False
             
             print_success("Configuration valid")

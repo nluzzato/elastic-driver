@@ -100,20 +100,15 @@ class BugsnagClient:
             'direction': 'desc'
         }
         
-        # Add filters object according to Bugsnag API documentation
-        filters = {}
-        
+        # Add direct query parameters (not filters object)
         if user_id:
-            filters['user.id'] = [{"eq": user_id}]
+            params['user.id'] = user_id
         
         if start_time:
-            filters['since'] = [{"eq": start_time}]
+            params['since'] = start_time
         
         if end_time:
-            filters['before'] = [{"eq": end_time}]
-        
-        if filters:
-            params['filters'] = json.dumps(filters)
+            params['before'] = end_time
         
         response = await self._make_request("GET", endpoint, params)
         
