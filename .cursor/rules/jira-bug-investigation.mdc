@@ -1,0 +1,152 @@
+---
+globs: mcp/**/*
+description: JIRA bug investigation using MCP tools
+---
+
+# JIRA Bug Investigation Guide
+
+When investigating bugs from JIRA tickets using the MCP tools, follow this comprehensive guide.
+
+## JIRA Custom Fields Reference
+
+Always extract these key fields from JIRA tickets:
+
+### User & Company Identification
+- **customfield_10129**: **User ID** (CRITICAL - this is the actual user ID for Bugsnag/Elasticsearch searches)
+- **customfield_10130**: Company/Account ID (do NOT use this as user ID)
+- **customfield_10147**: Company Identifier (bbdtotfipysfbeot format)
+- **customfield_10131**: Company Name
+- **customfield_10137**: Customer Email
+
+### Technical Details
+- **customfield_10126**: App Version (e.g., "9.1.1.34")
+- **customfield_10125**: OS Version (e.g., "Android 13")
+- **customfield_10340**: Device Model (e.g., "Samsung Note 20")
+- **customfield_10254**: Platform Array (e.g., ["Android"])
+- **customfield_10115**: Platform Category ("📱Mobile / Kiosk", "💻Web", etc.)
+
+### Bug Context
+- **customfield_10180**: Expected vs Actual behavior description
+- **customfield_10120**: Steps to reproduce
+- **customfield_10123**: Bug category (e.g., "Performance")
+- **customfield_10206**: Feature area (e.g., "Chat")
+
+### Customer Support Context
+- **customfield_10138**: Intercom conversation link
+- **customfield_10139**: HubSpot company link
+- **customfield_10140**: Matrix company link
+- **customfield_10298**: Service desk portal link
+
+## Investigation Process
+
+### 1. Extract Information
+```bash
+# Always verify the user ID - it's customfield_10129, NOT customfield_10130
+USER_ID = customfield_10129  # Actual user ID
+COMPANY_ID = customfield_10130  # Company ID (different!)
+APP_VERSION = customfield_10126
+PLATFORM = customfield_10254[0]
+INCIDENT_DATE = created field
+```
+
+### 2. Bugsnag Investigation
+Use `mcp_connecteam-mcp_fetch_user_errors_bugsnag`:
+- Search around incident time ±48 hours
+- Use the correct user ID (customfield_10129)
+- Look for errors in chatView, specific feature contexts
+- Match error timing with reported issue time
+
+### 3. Elasticsearch Investigation
+Use `mcp_connecteam-mcp_fetch_elastic_user_logs`:
+- Search around incident time ±24 hours
+- Look for error logs and slow requests
+- Verify user activity during the timeframe
+- Check for performance issues
+
+### 4. Correlation Analysis
+- Match Bugsnag error context with reported feature area
+- Look for JavaScript errors like "Cannot read property X of undefined"
+- Verify app version consistency between logs and ticket
+- Check timing correlation between error and ticket creation
+
+## Common Investigation Patterns
+
+### Mobile App Crashes
+- Look for: JavaScript errors in mobile context
+- Common errors: undefined property access, null reference errors
+- Check: chatView, specific feature contexts
+
+### Performance Issues
+- Look for: slow requests in Elasticsearch
+- Check: request times > 2-5 seconds
+- Verify: app version and device model impact
+
+### Chat-Related Issues
+- Bugsnag context: "chatView"
+- Common errors: string manipulation on undefined values
+- Elasticsearch: chat-related API calls
+
+## MCP Tools Reference
+
+### Bugsnag Search
+```typescript
+mcp_connecteam-mcp_fetch_user_errors_bugsnag({
+  user_id: customfield_10129,  // NOT customfield_10130!
+  timeframe_minutes: 2880,     // 48 hours
+  start_time: "2025-07-15T17:00:00Z",
+  limit_per_project: 50
+})
+```
+
+### Elasticsearch Search
+```typescript
+mcp_connecteam-mcp_fetch_elastic_user_logs({
+  user_id: customfield_10129,  // NOT customfield_10130!
+  timeframe_minutes: 1440,     // 24 hours
+  start_time: "2025-07-15T17:00:00Z",
+  slow_request_threshold: 2,
+  limit: 100
+})
+```
+
+### Broad Error Search
+```typescript
+mcp_connecteam-mcp_search_elastic_logs_primitive({
+  index_pattern: "logs-*",
+  query: {
+    "bool": {
+      "must": [
+        {"range": {"@timestamp": {"gte": "start", "lte": "end"}}},
+        {"query_string": {"query": "feature AND (crash OR error)"}}
+      ]
+    }
+  },
+  size: 50
+})
+```
+
+## Success Indicators
+
+✅ **Good Investigation:**
+- Found specific Bugsnag error matching the reported issue
+- Error context matches feature area (e.g., chatView for chat issues)
+- Timing correlation between error and ticket
+- Technical root cause identified
+
+❌ **Investigation Issues:**
+- Using wrong user ID (customfield_10130 instead of 10129)
+- No error correlation found
+- Timing doesn't match
+- No actionable technical details
+
+## Documentation Template
+
+Always provide:
+1. **Ticket Summary**: Key details from custom fields
+2. **User ID Verification**: Confirm correct user ID used
+3. **Bugsnag Findings**: Specific errors with context
+4. **Elasticsearch Findings**: User activity and performance issues
+5. **Root Cause Analysis**: Technical explanation
+6. **Recommended Actions**: Specific development tasks
+
+Remember: The user ID in customfield_10129 is CRITICAL for successful investigation!
