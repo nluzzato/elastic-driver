@@ -150,3 +150,15 @@ Always provide:
 6. **Recommended Actions**: Specific development tasks
 
 Remember: The user ID in customfield_10129 is CRITICAL for successful investigation!
+
+## New MCP Tool: Context Reference
+
+Use the `get_connecteam_context_info()` tool to get a quick reference of all JIRA custom field meanings:
+
+```typescript
+// Get field reference
+const context = get_connecteam_context_info();
+// Returns: { jira_context: { "customfield_10129": "User ID (CRITICAL)", ... } }
+```
+
+This eliminates the need to memorize field mappings and ensures you always use the correct field for investigations.

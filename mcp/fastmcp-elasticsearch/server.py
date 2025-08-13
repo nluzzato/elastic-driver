@@ -8,7 +8,6 @@ This server provides essential tools for Elasticsearch and Bugsnag operations:
 - fetch_user_errors_bugsnag: User-specific Bugsnag errors
 """
 
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -16,12 +15,7 @@ from fastmcp import FastMCP
 from dotenv import load_dotenv
 
 # Import our architecture components
-from config import (
-    get_current_environment,
-    get_environment_config,
-    get_index_config,
-    get_field_mapping,
-)
+from config import get_current_environment
 from tools.primitives import search_elastic_logs
 from tools.primitives.bugsnag import bugsnag_health_check
 from tools.flows.bugsnag_user_analysis import fetch_bugsnag_user_logs
@@ -188,7 +182,7 @@ def fetch_elastic_user_logs(
             # Parse the provided start time
             start_time_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
             end_time = start_time_dt + timedelta(minutes=timeframe_minutes)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             # Fall back to current time if parsing fails
             end_time = datetime.now(timezone.utc)
             start_time_dt = end_time - timedelta(minutes=timeframe_minutes)
@@ -319,7 +313,7 @@ def fetch_elastic_user_logs(
     total_slow_requests = len(slow_requests)
     has_recent_activity = most_recent_log is not None
     
-    if has_recent_activity:
+    if has_recent_activity and most_recent_log:
         insights.append(f"✅ User found - last activity: {most_recent_log['timestamp']}")
     else:
         insights.append("⚠️ No recent activity found for this user")
@@ -383,6 +377,47 @@ def fetch_user_errors_bugsnag(
         start_time=start_time,
         limit_per_project=limit_per_project
     )
+
+
+@mcp.tool()
+def get_connecteam_context_info() -> Dict[str, Any]:
+    """
+    Get Connecteam JIRA custom field reference information.
+    
+    Returns a mapping of JIRA custom fields to their meanings for 
+    Connecteam bug investigation context.
+    
+    Returns:
+        Dictionary mapping custom field IDs to their descriptions
+    """
+    return {
+        "jira_context": {
+            "customfield_10129": "User ID (CRITICAL - use this for Bugsnag/Elasticsearch searches)",
+            "customfield_10130": "Company/Account ID (do NOT use as user ID)",
+            "customfield_10147": "Company Identifier (bbdtotfipysfbeot format)",
+            "customfield_10131": "Company Name",
+            "customfield_10137": "Customer Email",
+            "customfield_10126": "App Version (e.g., '9.1.1.34')",
+            "customfield_10125": "OS Version (e.g., 'Android 13')",
+            "customfield_10340": "Device Model (e.g., 'Samsung Note 20')",
+            "customfield_10254": "Platform Array (e.g., ['Android'])",
+            "customfield_10115": "Platform Category ('📱Mobile / Kiosk', '💻Web', etc.)",
+            "customfield_10180": "Expected vs Actual behavior description",
+            "customfield_10120": "Steps to reproduce",
+            "customfield_10123": "Bug category (e.g., 'Performance')",
+            "customfield_10206": "Feature area (e.g., 'Chat')",
+            "customfield_10138": "Intercom conversation link",
+            "customfield_10139": "HubSpot company link",
+            "customfield_10140": "Matrix company link",
+            "customfield_10298": "Service desk portal link"
+        },
+        "investigation_tips": [
+            "Always use customfield_10129 (User ID) for searches, never customfield_10130",
+            "Check platform to determine mobile vs web investigation focus",
+            "Look for feature area to target specific error contexts in Bugsnag",
+            "Use app version for filtering if investigating version-specific issues"
+        ]
+    }
 
 
 if __name__ == "__main__":
